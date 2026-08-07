@@ -1,0 +1,27 @@
+### local env & secrets ###
+.env
+
+### build outputs ###
+target/
+frontend/node_modules/
+frontend/dist/
+tools/out/
+*.log
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### VS Code ###
+.vscode/
+
+### Eclipse/STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache

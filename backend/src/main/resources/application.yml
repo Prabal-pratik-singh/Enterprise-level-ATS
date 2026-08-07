@@ -1,0 +1,32 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: ats
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/ats}
+    username: ${DB_USER:ats}
+    password: ${DB_PASSWORD:ats}
+  jpa:
+    # Flyway owns the schema; Hibernate never generates or validates DDL
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+app:
+  # api | parser | extractor | embedder | dedup | fraud | matcher | indexer
+  role: ${APP_ROLE:api}
+  s3:
+    endpoint: ${S3_ENDPOINT:http://localhost:9000}
+    access-key: ${S3_ACCESS_KEY:minioadmin}
+    secret-key: ${S3_SECRET_KEY:minioadmin}
+    bucket: ${S3_BUCKET:resumes}
