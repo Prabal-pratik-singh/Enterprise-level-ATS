@@ -2,7 +2,7 @@
 
 | Phase | Title | Status |
 |------:|-------|--------|
-| 1 | Infrastructure & skeleton | 🔨 IN PROGRESS — first `docker compose up -d --build` running, DoD checks pending |
+| 1 | Infrastructure & skeleton | ✅ DONE — DoD verified 2026-08-07: all services healthy, health UP, 9 tables + flyway history, 18 topics × 12 partitions |
 | 2 | Apply & upload flow (presigned uploads) | — |
 | 3 | Parser worker (PDF/DOCX/OCR) | — |
 | 4 | Extraction worker (LLM → profile) | — |
