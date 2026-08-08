@@ -3,7 +3,7 @@
 | Phase | Title | Status |
 |------:|-------|--------|
 | 1 | Infrastructure & skeleton | ✅ DONE — DoD verified 2026-08-07: all services healthy, health UP, 9 tables + flyway history, 18 topics × 12 partitions |
-| 2 | Apply & upload flow (presigned uploads) | — |
+| 2 | Apply & upload flow (presigned uploads) | ✅ DONE — DoD verified 2026-08-09: seed 20 → 20 APPLIED, 20 MinIO objects, resume.uploaded=20, outbox 40/40 published |
 | 3 | Parser worker (PDF/DOCX/OCR) | — |
 | 4 | Extraction worker (LLM → profile) | — |
 | 5 | Scoring engine + Recruiter Dashboard v1 | — |
@@ -24,3 +24,10 @@
 - **2026-08-07 · No host Python** — the Phase 2 resume generator will run via a one-shot `python:3.12-slim` container instead of a host install.
 - **2026-08-07 · Spec archived** verbatim as `ATS-BUILD-PROMPT.md` so any session can consult it.
 - **2026-08-07 · Docker/WSL2 memory is ~7.4 GiB** (default cap, no `.wslconfig`). Fine through Phase 3; before Phase 4 (Ollama) the plan is to raise it to ~12 GB via `C:\Users\ASUS\.wslconfig` with the user's OK.
+- **2026-08-09 · Presigner signs for a public endpoint** (`S3_PUBLIC_ENDPOINT`, default `http://localhost:9000`): the SigV4 signature covers the Host header, so URLs must be signed for the address the uploading client actually hits — not the in-network `minio:9000`. Cloud swap stays an env change.
+- **2026-08-09 · Seed job has a fixed UUID** (`00000000-0000-0000-0000-000000000001`) so tools and later DoD commands can target it deterministically.
+- **2026-08-09 · seed.sh default SEED is random per run** (emails embed a random number + index), so repeated seeding across phases never violates `UNIQUE(job_id, candidate_id)`. `SEED=42 ./tools/seed.sh N` reproduces a batch exactly.
+- **2026-08-09 · Generator mix rule**: N≥10 → 1 corrupt + 3 planted-fraud resumes included; N≥5 → ~18% of normal resumes are image-only (OCR targets). The corrupt file has valid `%PDF` magic bytes ON PURPOSE — it must pass upload validation so it can poison the parser and prove DLQ handling in Phase 3.
+- **2026-08-09 · Resume generator runs in `python:3.12-slim`** with a named pip-cache volume (`ats-pip-cache`) — no host Python; reportlab's bundled Vera.ttf doubles as the PIL font for image-only PDFs.
+- **2026-08-09 · `/resume/complete` is idempotent** (same application+version returns the existing row, no duplicate event) and rejects keys outside the application's own prefix.
+- **2026-08-09 · Outbox relay**: at-least-once, batch 200, `FOR UPDATE SKIP LOCKED`, runs in every role (safe concurrent relays); consumers will dedupe via `processed_events`. Domain FKs are raw UUID columns (no `@ManyToOne`) to keep the worker/domain split lean.

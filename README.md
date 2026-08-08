@@ -64,3 +64,19 @@ presigned PUTs so resume bytes never transit the API.
   idempotency ledger, and the `outbox`.
 - Docker image: multi-stage build, JRE 21 runtime with tesseract-ocr (+eng) baked
   in for the Phase 3 OCR fallback.
+
+### Phase 2 — Apply & upload flow (presigned uploads)
+- REST: `POST /api/candidates`, `POST /api/jobs/{jobId}/applications` (creates the
+  application as APPLIED + `application.created` via the outbox),
+  `POST /api/applications/{id}/resume/upload-url` (10-minute presigned PUT to
+  `resumes/{jobId}/{appId}/v{n}/resume.{ext}` — bytes go straight to MinIO, never
+  through the API), `POST .../resume/complete` (HEAD + magic-byte allowlist
+  PDF/DOCX/PNG/JPG + ≤10 MB + streamed SHA-256 → resumes row + `resume.uploaded`).
+- Transactional outbox is live: business rows and events commit together; a 500 ms
+  relay (`FOR UPDATE SKIP LOCKED`, at-least-once) publishes envelopes
+  `{event_id, event_type, occurred_at, application_id, job_id, data, schema_version}`.
+- Flyway V2 seeds the demo job "Backend Engineer — Java/Kafka" (fixed UUID
+  `...000000000001`) with structured must-have/nice-to-have requirements.
+- `tools/seed.sh N` generates N synthetic resumes in a throwaway Python container
+  (varied text templates, image-only OCR targets, 1 corrupt file and 3 planted-fraud
+  resumes at N≥10) and drives the real API end to end.
