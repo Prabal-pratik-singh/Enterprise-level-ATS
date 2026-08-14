@@ -37,11 +37,28 @@ to override.
 
 ## How it's put together
 
-**One Spring Boot image plays every role.** The `APP_ROLE` env var (`api`,
-`parser`, `extractor`, `embedder`, `dedup`, `fraud`, `matcher`, `indexer`) decides
-which Kafka listeners a container activates and whether it serves HTTP. Compose
-runs the same image as multiple services — which is what makes
-`docker compose up -d --scale parser=8` possible with zero extra images.
+**Event-driven microservices, one Maven module per service.** The backend is a
+multi-module reactor: `ats-common` (shared contracts library — domain entities,
+Kafka topic catalog, event envelope, transactional outbox, Flyway migrations)
+plus one independently built and deployable Spring Boot service per pipeline
+stage, each with its own Docker image:
+
+| Service | Pipeline stage (design-board name) |
+|---|---|
+| `api-service` | HTTP edge: Application + Job + Upload services (merged for the demo) |
+| `parser-service` (Phase 3) | Parsing Service — PDF/DOCX/OCR → clean text |
+| `extractor-service` (Phase 4) | Extraction Service — LLM → structured profile |
+| `matcher-service` (Phase 5) | Matching Service — explainable scoring |
+| `dedup-service` (Phase 6) | Deduplication Service |
+| `fraud-service` (Phase 6) | Trust Service — fraud heuristics, flags never auto-reject |
+| `embedder-service` (Phase 7) | Embeddings — semantic vectors |
+| `indexer-service` (Phase 7) | Search Service — OpenSearch read model (CQRS) |
+
+Services never call each other synchronously — every hop is a Kafka event, which
+is what makes `docker compose up -d --scale parser=8` a one-liner. The one
+deliberate compromise vs. purist microservices: a shared PostgreSQL instance
+(every stage enriches the same application record); splitting data ownership
+per service is the named next step at production scale.
 
 **Events over Kafka** (KRaft, single broker): 9 domain topics + a `.dlq` twin
 each, 12 partitions per topic, keyed by `applicationId`, payloads carry S3 keys

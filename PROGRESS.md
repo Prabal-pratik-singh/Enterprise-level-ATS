@@ -1,5 +1,9 @@
 # PROGRESS
 
+## Spec amendments (user-directed)
+
+- **2026-08-14 · Microservice conversion** — amends the spec's locked "single application / ONE image / APP_ROLE" worker model at the user's request. The backend is now a Maven multi-module reactor: `ats-common` (shared contracts library: domain, topic catalog, event envelope, outbox publisher + relay, Flyway migrations, shared config) plus one independently built and deployable Spring Boot service per pipeline stage, each with its own Dockerfile/image (`ats/api-service` today; parser/extractor/matcher/dedup/fraud/embedder/indexer services arrive with their phases). APP_ROLE is removed. Compose service names stay (`api`, `parser`, …) so every DoD command in the spec still works verbatim, including `--scale parser=8`. Postgres remains shared (documented honestly in the README; per-service data ownership is the named production step). Board-name mapping: fraud-service = design board's "Trust Service", indexer-service = "Search Service". Re-verified after the split: seed 10 → 30 APPLIED total, resume.uploaded=30, 30 MinIO objects, outbox 60/60 published.
+
 | Phase | Title | Status |
 |------:|-------|--------|
 | 1 | Infrastructure & skeleton | ✅ DONE — DoD verified 2026-08-07: all services healthy, health UP, 9 tables + flyway history, 18 topics × 12 partitions |
@@ -31,3 +35,7 @@
 - **2026-08-09 · Resume generator runs in `python:3.12-slim`** with a named pip-cache volume (`ats-pip-cache`) — no host Python; reportlab's bundled Vera.ttf doubles as the PIL font for image-only PDFs.
 - **2026-08-09 · `/resume/complete` is idempotent** (same application+version returns the existing row, no duplicate event) and rejects keys outside the application's own prefix.
 - **2026-08-09 · Outbox relay**: at-least-once, batch 200, `FOR UPDATE SKIP LOCKED`, runs in every role (safe concurrent relays); consumers will dedupe via `processed_events`. Domain FKs are raw UUID columns (no `@ManyToOne`) to keep the worker/domain split lean.
+- **2026-08-14 · Multi-module Docker builds**: each service's Dockerfile uses the backend/ reactor as build context and `mvn -pl <service> -am` (every module pom is copied for reactor resolution; the go-offline layer caches dependencies). Only parser-service will carry tesseract — other images stay slim. Migrations live in ats-common so ANY service can boot first; Flyway's lock makes concurrent starts safe.
+- **2026-08-14 · Service mains live at `com.ats`** so component scan discovers ats-common beans (domain, events, config) without explicit `scanBasePackages`.
+- **2026-08-14 · sahayak containers set to `restart: unless-stopped`** (were auto-reviving after reboots and reclaiming ports 8080/5432, which broke the ats stack's networking mid-start). Manual stops now persist across reboots; revert with `docker update --restart always sahayak-backend sahayak-postgres`.
+- **2026-08-14 · Commit policy**: granular commits at working checkpoints, pushed immediately (user request — richer GitHub history).
