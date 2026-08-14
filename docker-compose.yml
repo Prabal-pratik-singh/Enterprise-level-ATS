@@ -116,10 +116,11 @@ services:
     restart: "no"
 
   api:
-    build: ./backend
-    image: ats-backend
+    build:
+      context: ./backend
+      dockerfile: api-service/Dockerfile
+    image: ats/api-service
     environment:
-      APP_ROLE: api
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ats}
       DB_USER: ${POSTGRES_USER:-ats}
