@@ -3,7 +3,7 @@ server:
 
 spring:
   application:
-    name: ats
+    name: api-service
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/ats}
     username: ${DB_USER:ats}
@@ -29,8 +29,6 @@ management:
         include: health,info
 
 app:
-  # api | parser | extractor | embedder | dedup | fraud | matcher | indexer
-  role: ${APP_ROLE:api}
   s3:
     endpoint: ${S3_ENDPOINT:http://localhost:9000}
     public-endpoint: ${S3_PUBLIC_ENDPOINT:http://localhost:9000}
