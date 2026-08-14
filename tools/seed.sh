@@ -6,7 +6,7 @@
 set -euo pipefail
 
 N=${1:?usage: seed.sh N}
-API=${API:-http://localhost:8080}
+API=${API:-http://localhost:8082}
 JOB_ID=${JOB_ID:-00000000-0000-0000-0000-000000000001}
 SEED=${SEED:-$RANDOM}   # varies per run so re-seeding never reuses emails; set SEED=42 for reproducibility
 

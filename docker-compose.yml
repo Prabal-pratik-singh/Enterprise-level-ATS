@@ -65,7 +65,8 @@ services:
   postgres:
     image: pgvector/pgvector:pg16
     ports:
-      - "5432:5432"
+      # Host port 5434 (5432/5433 belong to other local stacks); in-network it's postgres:5432
+      - "5434:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-ats}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ats}
@@ -133,7 +134,8 @@ services:
       S3_BUCKET: resumes
       JAVA_OPTS: -XX:MaxRAMPercentage=75
     ports:
-      - "8080:8080"
+      # Host port 8082 (8080 belongs to another local stack); in-network it's still api:8080
+      - "8082:8080"
     depends_on:
       kafka:
         condition: service_healthy
@@ -176,7 +178,8 @@ services:
     image: ollama/ollama:latest
     profiles: ["llm"]
     ports:
-      - "11434:11434"
+      # Host port 11435 (11434 belongs to another local Ollama); in-network it's ollama:11434
+      - "11435:11434"
     volumes:
       - ollama-data:/root/.ollama
     healthcheck:

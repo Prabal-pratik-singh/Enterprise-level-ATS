@@ -24,13 +24,17 @@ docker compose up -d --build
 
 | Service | Where |
 |---|---|
-| API | http://localhost:8080 — health at `/actuator/health` |
+| API | http://localhost:8082 — health at `/actuator/health` |
 | Kafka UI (lag visualizer) | http://localhost:8085 |
 | MinIO console | http://localhost:9001 (minioadmin / minioadmin) |
-| Postgres (pgvector) | localhost:5432 (ats / ats) |
-| Frontend (from Phase 5) | http://localhost:5173 |
-| Ollama (from Phase 4, profile `llm`) | http://localhost:11434 |
+| Postgres (pgvector) | localhost:5434 (ats / ats) |
+| Frontend (from Phase 5) | http://localhost:5174 |
+| Ollama (from Phase 4, profile `llm`) | http://localhost:11435 |
 | OpenSearch (from Phase 7, profile `search`) | http://localhost:9200 |
+
+Host ports are picked to coexist with other local stacks; inside the compose
+network the services still use their native ports (`api:8080`, `postgres:5432`,
+`ollama:11434`).
 
 No `.env` needed — compose ships working defaults; copy `.env.example` to `.env`
 to override.
