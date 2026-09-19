@@ -20,6 +20,7 @@ import com.ats.domain.Resume;
 import com.ats.domain.ResumeRepository;
 import com.ats.events.OutboxPublisher;
 import com.ats.events.Topics;
+import com.ats.util.FileTypes;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -114,7 +115,8 @@ public class ResumeService {
         if (head.contentLength() > MAX_BYTES) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "file exceeds the 10MB limit");
         }
-        String detected = detectType(readHeaderBytes(key));
+        // Real type comes from the file's first bytes (shared util), never the filename
+        String detected = FileTypes.detect(readHeaderBytes(key));
         if (detected == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "unrecognized file type — magic bytes must be PDF, DOCX, PNG or JPG");
@@ -155,27 +157,6 @@ public class ResumeService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "key has no version segment");
         }
         return Integer.parseInt(m.group(1));
-    }
-
-    /**
-     * Demo simplification (documented in README): magic-byte allowlist instead
-     * of ClamAV. DOCX shares the generic ZIP signature, so any zip passes as
-     * "docx" — acceptable here.
-     */
-    private static String detectType(byte[] h) {
-        if (h.length >= 5 && h[0] == '%' && h[1] == 'P' && h[2] == 'D' && h[3] == 'F') {
-            return "pdf";
-        }
-        if (h.length >= 8 && (h[0] & 0xFF) == 0x89 && h[1] == 'P' && h[2] == 'N' && h[3] == 'G') {
-            return "png";
-        }
-        if (h.length >= 3 && (h[0] & 0xFF) == 0xFF && (h[1] & 0xFF) == 0xD8 && (h[2] & 0xFF) == 0xFF) {
-            return "jpg";
-        }
-        if (h.length >= 4 && h[0] == 'P' && h[1] == 'K' && h[2] == 0x03 && h[3] == 0x04) {
-            return "docx";
-        }
-        return null;
     }
 
     private byte[] readHeaderBytes(String key) {
