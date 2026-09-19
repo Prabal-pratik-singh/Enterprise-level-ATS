@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.ats</groupId>
+        <artifactId>ats-parent</artifactId>
+        <version>0.1.0</version>
+    </parent>
+    <artifactId>parser-service</artifactId>
+    <name>parser-service</name>
+    <description>Parsing Service: resume.uploaded → clean text + layout metadata → resume.parsed.
+        PDFBox for text PDFs (with font/color capture), Tesseract OCR fallback for scans,
+        Tika for DOCX.</description>
+
+    <properties>
+        <!-- versions verified on Maven Central before writing this pom -->
+        <pdfbox.version>3.0.8</pdfbox.version>
+        <tika.version>4.0.0</tika.version>
+        <tess4j.version>5.20.0</tess4j.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.ats</groupId>
+            <artifactId>ats-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>${pdfbox.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-core</artifactId>
+            <version>${tika.version}</version>
+        </dependency>
+        <dependency>
+            <!-- just the DOCX/Office parser, not Tika's giant all-formats bundle -->
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-parser-microsoft-module</artifactId>
+            <version>${tika.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>net.sourceforge.tess4j</groupId>
+            <artifactId>tess4j</artifactId>
+            <version>${tess4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

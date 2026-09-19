@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: parser-service
+  main:
+    web-application-type: none   # worker: Kafka in, Kafka out — no web server to run
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5434/ats}   # 5434 = our remapped host port for local runs
+    username: ${DB_USER:ats}
+    password: ${DB_PASSWORD:ats}
+  jpa:
+    hibernate:
+      ddl-auto: none    # Flyway (in ats-common) owns the schema
+    open-in-view: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: parser-service        # all parser containers share this — that's how work splits across them
+      auto-offset-reset: earliest     # first start processes the whole backlog, not just new events
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      enable-auto-commit: false       # offsets commit only AFTER the listener finishes successfully
+    producer:                         # workers also produce: outbox relay + DLQ publishing
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+
+app:
+  s3:
+    endpoint: ${S3_ENDPOINT:http://localhost:9000}
+    public-endpoint: ${S3_PUBLIC_ENDPOINT:http://localhost:9000}
+    access-key: ${S3_ACCESS_KEY:minioadmin}
+    secret-key: ${S3_SECRET_KEY:minioadmin}
+    bucket: ${S3_BUCKET:resumes}

@@ -67,6 +67,21 @@ public class Resume {
         this.updatedAt = this.createdAt;
     }
 
+    /** Parser success: record how the text was obtained and where parsed.json lives. */
+    public void markParsed(String parseMethod, Double ocrConfidence, String parsedS3Key) {
+        this.parseStatus = "PARSED";
+        this.parseMethod = parseMethod;       // "pdfbox" | "ocr" | "tika" — the DoD groups by this
+        this.ocrConfidence = ocrConfidence;   // null unless OCR ran
+        this.parsedS3Key = parsedS3Key;       // where downstream stages find the extracted text
+        this.updatedAt = Instant.now();
+    }
+
+    /** Parser gave up (corrupt/unreadable file). The error details go to application_events. */
+    public void markParseFailed() {
+        this.parseStatus = "FAILED";
+        this.updatedAt = Instant.now();
+    }
+
     public UUID getId() {
         return id;
     }
