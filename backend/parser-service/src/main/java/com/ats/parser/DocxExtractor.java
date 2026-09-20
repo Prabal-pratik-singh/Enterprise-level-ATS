@@ -1,8 +1,8 @@
 package com.ats.parser;
 
 import java.io.ByteArrayInputStream;
-import java.io.InputStream;
 
+import org.apache.tika.io.TikaInputStream;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.ParseContext;
 import org.apache.tika.parser.microsoft.ooxml.OOXMLParser;
@@ -22,7 +22,8 @@ public class DocxExtractor {
         BodyContentHandler textCollector = new BodyContentHandler(-1);
         Metadata metadata = new Metadata(); // Tika fills this with document properties while parsing
 
-        try (InputStream in = new ByteArrayInputStream(docxBytes)) {
+        // Tika 4 requires its own stream wrapper (it adds mark/reset + temp-file support)
+        try (TikaInputStream in = TikaInputStream.get(new ByteArrayInputStream(docxBytes))) {
             new OOXMLParser().parse(in, textCollector, metadata, new ParseContext());
         } catch (Exception e) {
             // Corrupt/fake docx -> loud failure -> retries -> DLQ, same as PDFs
