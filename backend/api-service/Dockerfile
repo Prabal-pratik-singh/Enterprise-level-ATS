@@ -9,6 +9,7 @@ WORKDIR /build
 COPY pom.xml .
 COPY ats-common/pom.xml ats-common/
 COPY api-service/pom.xml api-service/
+COPY parser-service/pom.xml parser-service/
 RUN mvn -q -B -pl api-service -am dependency:go-offline
 COPY ats-common/src ats-common/src
 COPY api-service/src api-service/src

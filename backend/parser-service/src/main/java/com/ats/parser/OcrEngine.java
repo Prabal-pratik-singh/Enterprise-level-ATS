@@ -102,7 +102,7 @@ public class OcrEngine {
 
     /** Find the tesseract language-data folder across common install locations. */
     private static String resolveTessdata() {
-        String env = System.getenv("TESSDATA_PREFIX"); // our Dockerfile sets this explicitly
+        String env = System.getenv("TESSDATA_PREFIX"); // optional override; normally we auto-probe below
         if (env != null && !env.isBlank()) {
             return env;
         }
