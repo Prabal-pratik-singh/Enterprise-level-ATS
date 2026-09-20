@@ -8,7 +8,7 @@
 |------:|-------|--------|
 | 1 | Infrastructure & skeleton | ✅ DONE — DoD verified 2026-08-07: all services healthy, health UP, 9 tables + flyway history, 18 topics × 12 partitions |
 | 2 | Apply & upload flow (presigned uploads) | ✅ DONE — DoD verified 2026-08-09: seed 20 → 20 APPLIED, 20 MinIO objects, resume.uploaded=20, outbox 40/40 published |
-| 3 | Parser worker (PDF/DOCX/OCR) | — |
+| 3 | Parser worker (PDF/DOCX/OCR) | ✅ DONE — DoD verified 2026-09-20: seed 20 → PARSED 19 + PARSE_FAILED 1; parse_method pdfbox 16 / ocr 3 (mean OCR confidence 94.2); resume.uploaded.dlq = exactly 1; resume.parsed = 19; hidden-text sample captured (378 chars @ 1pt) |
 | 4 | Extraction worker (LLM → profile) | — |
 | 5 | Scoring engine + Recruiter Dashboard v1 | — |
 | 6 | Deduplication + fraud heuristics | — |
@@ -39,4 +39,5 @@
 - **2026-08-14 · Service mains live at `com.ats`** so component scan discovers ats-common beans (domain, events, config) without explicit `scanBasePackages`.
 - **2026-08-14 · sahayak containers set to `restart: unless-stopped`** (were auto-reviving after reboots and reclaiming ports 8080/5432, which broke the ats stack's networking mid-start). Manual stops now persist across reboots; revert with `docker update --restart always sahayak-backend sahayak-postgres`.
 - **2026-08-14 · Commit policy**: granular commits at working checkpoints, pushed immediately (user request — richer GitHub history).
+- **2026-09-20 · Phase 3 notes**: (a) **Tika 4.0.0** changed `Parser.parse` to require `TikaInputStream` — compiler-forced one-line fix in DocxExtractor. (b) **tessdata path is auto-probed** at runtime (Ubuntu moves it between `/4.00/` and `/5/`) instead of a hardcoded ENV. (c) **Kafka retention raised to 720h** — the default 7 days silently expired August's events during a long pause, so the old synthetic data was reset (volumes wiped, fresh seed). (d) S3 keys include a `resumes/` prefix INSIDE the `resumes` bucket (the spec's key format) — harmless, but `mc` paths need it twice: `local/resumes/resumes/...`. (e) White-ink detection nuance: the planted white 1pt text registers 378 chars via the tiny-font counter while `nearWhiteChars` reads 0 for reportlab-generated PDFs; Phase 6's flag is tiny-OR-white so it still fires — revisit color-space handling then. (f) Review workflow active: every code batch is user-approved before writing.
 - **2026-08-14 · Host ports remapped** (user request — coexist with other local stacks instead of stopping them): API **8082**, Postgres **5434**, Ollama **11435**, frontend **5174** (Phase 5). Container-internal ports unchanged (`api:8080`, `postgres:5432`, `ollama:11434`), so healthchecks, presigned URLs (:9000) and all in-network wiring are untouched. Spec DoD commands adapt (`localhost:8080` → `localhost:8082`).

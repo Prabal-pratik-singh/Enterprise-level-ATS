@@ -101,3 +101,20 @@ presigned PUTs so resume bytes never transit the API.
 - `tools/seed.sh N` generates N synthetic resumes in a throwaway Python container
   (varied text templates, image-only OCR targets, 1 corrupt file and 3 planted-fraud
   resumes at N≥10) and drives the real API end to end.
+
+### Phase 3 — Parser worker (PDF/DOCX/OCR)
+- `parser-service` (the first worker microservice) consumes `resume.uploaded`:
+  PDFBox extracts text while a custom stripper records every character's font
+  size and ink color — hidden white/1pt keyword stuffing shows up as counters
+  plus a captured sample in `parsed.json`, stored beside the resume in MinIO.
+- Image-only resumes (< 100 chars/page) fall back to OCR: pages render at
+  200 DPI and Tesseract reads them, with mean word confidence saved to
+  `resumes.ocr_confidence`. DOCX goes through Apache Tika. Only this service's
+  image carries tesseract.
+- The trust rules are now real: consumers are idempotent via the
+  `processed_events` ledger, and failures retry 3× then land in
+  `resume.uploaded.dlq` with exception headers — a DLQ listener marks the
+  application `PARSE_FAILED` with the error in its audit trail. The planted
+  corrupt file proves the whole path (exactly 1 DLQ message per 20-seed).
+- Success path: application → `PARSED`, `resume.parsed` emitted through the
+  outbox for the Phase 4 extractor.
