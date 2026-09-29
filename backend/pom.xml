@@ -19,6 +19,7 @@
         <module>ats-common</module>
         <module>api-service</module>
         <module>parser-service</module>
+        <module>extractor-service</module>
     </modules>
 
     <properties>

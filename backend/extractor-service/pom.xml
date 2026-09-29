@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.ats</groupId>
+        <artifactId>ats-parent</artifactId>
+        <version>0.1.0</version>
+    </parent>
+    <artifactId>extractor-service</artifactId>
+    <name>extractor-service</name>
+    <description>Extraction Service: resume.parsed → LLM → validated canonical profile →
+        resume.extracted. Injection-hardened prompts, schema validation with one corrective
+        retry, taxonomy-normalized skills, derived facts computed in Java.</description>
+
+    <properties>
+        <!-- 1.5.9 = last release of the mature 1.x line; the brand-new 3.x major
+             changed APIs and is weeks old — not portfolio-stable yet -->
+        <json-schema-validator.version>1.5.9</json-schema-validator.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.ats</groupId>
+            <artifactId>ats-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <version>${json-schema-validator.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

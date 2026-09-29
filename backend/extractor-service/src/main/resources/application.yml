@@ -1,0 +1,50 @@
+spring:
+  application:
+    name: extractor-service
+  main:
+    web-application-type: none
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5434/ats}
+    username: ${DB_USER:ats}
+    password: ${DB_PASSWORD:ats}
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: extractor-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      enable-auto-commit: false
+      # LLM calls are SLOW (up to ~90s each on CPU). One message per poll keeps
+      # us inside Kafka's 5-minute max.poll.interval — otherwise the broker
+      # declares us dead mid-batch and rebalances forever.
+      max-poll-records: 1
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+
+app:
+  llm:
+    provider: ${LLM_PROVIDER:ollama}          # ollama | groq | gemini — the one-var swap
+    connect-timeout-seconds: 5                # spec
+    read-timeout-seconds: ${LLM_READ_TIMEOUT_SECONDS:60}   # spec default; compose gives local Ollama 180
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      model: ${OLLAMA_MODEL:qwen2.5:3b}       # spec-locked default model
+    groq:
+      api-key: ${GROQ_API_KEY:}               # from .env via compose — never hardcoded
+      model: ${GROQ_MODEL:llama-3.1-8b-instant}
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+      model: ${GEMINI_MODEL:gemini-2.0-flash}
+  s3:
+    endpoint: ${S3_ENDPOINT:http://localhost:9000}
+    public-endpoint: ${S3_PUBLIC_ENDPOINT:http://localhost:9000}
+    access-key: ${S3_ACCESS_KEY:minioadmin}
+    secret-key: ${S3_SECRET_KEY:minioadmin}
+    bucket: ${S3_BUCKET:resumes}
