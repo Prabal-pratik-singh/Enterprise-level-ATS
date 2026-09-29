@@ -118,3 +118,22 @@ presigned PUTs so resume bytes never transit the API.
   corrupt file proves the whole path (exactly 1 DLQ message per 20-seed).
 - Success path: application → `PARSED`, `resume.parsed` emitted through the
   outbox for the Phase 4 extractor.
+
+### Phase 4 — Extraction worker (LLM → structured profile)
+- `extractor-service` turns parsed resume text into one canonical JSON profile
+  per application via a **pluggable LLM layer** (`LLM_PROVIDER=ollama|groq|gemini`
+  — local qwen2.5:3b by default, cloud swap is one env var; Bedrock at scale is
+  the same trick).
+- The LLM is never trusted: prompts declare resume text as *data, not
+  instructions* (injection defense), answers are validated against a JSON
+  Schema with one corrective retry, missing contacts get regex-recovered, and
+  all math — overlap-aware experience months, seniority, completeness — is
+  computed in Java, never by the model.
+- Skills are normalized through a 150-entry taxonomy (aliases + first-release
+  years); unknown spellings land in `unmatched_skills` (the taxonomy's to-do
+  list — it caught OCR misreads like "rabbitmag" on day one).
+- Battle scars encoded in code: Groq's 429 rate limits are treated as
+  backpressure (sleep-and-retry per the server's hint), cloud model names are
+  config because providers retire them, and `max-poll-records=1` keeps slow
+  LLM calls inside Kafka's poll deadline. One stubborn resume that failed on
+  two models was rescued by a third — pluggability as resilience, live.
