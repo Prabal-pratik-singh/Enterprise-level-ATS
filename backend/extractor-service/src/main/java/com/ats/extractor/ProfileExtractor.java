@@ -110,11 +110,27 @@ public class ProfileExtractor {
             if (!(node instanceof ObjectNode obj)) {
                 return new Attempt(null, "the answer is not a JSON object");
             }
+            obj = unwrapIfNested(obj); // forgive {"CandidateProfile": {...}} wrapping
+            if (obj.has("properties") || obj.has("$schema")) {
+                // The model parroted the schema back — tell it exactly that on retry
+                return new Attempt(null, "you returned the schema itself — return the extracted profile DATA instead");
+            }
             var errors = validator.validate(obj);
             return errors.isEmpty() ? new Attempt(obj, null) : new Attempt(null, String.join("; ", errors));
         } catch (JsonProcessingException e) {
             return new Attempt(null, "not parseable JSON: " + e.getOriginalMessage());
         }
+    }
+
+    /** Small models sometimes wrap the profile in a single-key envelope. Unwrap one level. */
+    private static ObjectNode unwrapIfNested(ObjectNode obj) {
+        if (!obj.has("contact") && obj.size() == 1) {
+            JsonNode only = obj.elements().next();
+            if (only instanceof ObjectNode inner && inner.has("contact")) {
+                return inner;
+            }
+        }
+        return obj;
     }
 
     /** LLM missed the email/phone? Plain regex over the raw text catches most. */

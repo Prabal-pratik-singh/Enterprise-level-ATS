@@ -26,6 +26,18 @@ final class ProfilePrompts {
                gets end_date null and current true.
             4. skills: list every individual technology/skill mentioned anywhere.
             5. Output exactly ONE JSON object. No markdown fences, no commentary.
+            6. Output the profile object DIRECTLY at the top level - do NOT wrap
+               it in any envelope like {"CandidateProfile": ...} or {"profile": ...},
+               and do NOT return the schema itself.
+
+            Your output must have exactly this shape (values here are only examples):
+            {"contact":{"name":"Asha Rao","email":"asha@example.com","phone":"+91-9812345678","location":"Pune"},
+             "summary":"Backend engineer with 4 years ...",
+             "experience":[{"title":"Software Engineer","company":"Acme","start_date":"2021-03","end_date":null,"current":true,"description":"Built ..."}],
+             "education":[{"degree":"B.Tech CSE","institution":"NIT Trichy","year":2021}],
+             "skills":["java","spring-boot","kafka"],
+             "projects":[{"name":"Order Tracker","description":"Streamed ..."}],
+             "certifications":["AWS Certified Developer - Associate"]}
             """;
 
     /** Clear delimiters around the resume so the model knows where data begins and ends. */
