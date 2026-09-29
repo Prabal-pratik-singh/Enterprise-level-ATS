@@ -206,6 +206,7 @@ services:
       # Groq retires models over time — this default was verified against their live catalog
       GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
       JAVA_OPTS: -XX:MaxRAMPercentage=75
     depends_on:
       kafka:
