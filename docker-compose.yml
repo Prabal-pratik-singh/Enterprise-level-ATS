@@ -184,6 +184,39 @@ services:
     # no ports, no healthcheck: pure worker — Kafka in, Kafka out
     mem_limit: 768m
 
+  extractor:
+    build:
+      context: ./backend
+      dockerfile: extractor-service/Dockerfile
+    image: ats/extractor-service
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ats}
+      DB_USER: ${POSTGRES_USER:-ats}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-ats}
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      S3_BUCKET: resumes
+      # ---- the LLM switch: ollama (default) | groq | gemini ----
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      OLLAMA_BASE_URL: http://ollama:11434       # in-network address of the ollama container
+      LLM_READ_TIMEOUT_SECONDS: "180"            # CPU inference needs headroom (spec's 60s assumes cloud/GPU)
+      GROQ_API_KEY: ${GROQ_API_KEY:-}            # values come from the gitignored .env
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      JAVA_OPTS: -XX:MaxRAMPercentage=75
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    # no ports/healthcheck: worker. Start ollama first: docker compose --profile llm up -d
+    mem_limit: 768m
+
   # ---------- Phase 7: docker compose --profile search up -d ----------
   opensearch:
     image: opensearchproject/opensearch:2.19.1
