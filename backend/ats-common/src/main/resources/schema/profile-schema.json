@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CandidateProfile",
+  "type": "object",
+  "required": ["contact", "experience", "education", "skills"],
+  "properties": {
+    "contact": {
+      "type": "object",
+      "properties": {
+        "name":     { "type": ["string", "null"] },
+        "email":    { "type": ["string", "null"] },
+        "phone":    { "type": ["string", "null"] },
+        "location": { "type": ["string", "null"] }
+      }
+    },
+    "summary": { "type": ["string", "null"] },
+    "experience": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title":       { "type": ["string", "null"] },
+          "company":     { "type": ["string", "null"] },
+          "start_date":  { "type": ["string", "null"], "description": "YYYY-MM" },
+          "end_date":    { "type": ["string", "null"], "description": "YYYY-MM, or null if current" },
+          "current":     { "type": ["boolean", "null"] },
+          "description": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "education": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "degree":      { "type": ["string", "null"] },
+          "institution": { "type": ["string", "null"] },
+          "year":        { "type": ["integer", "null"] }
+        }
+      }
+    },
+    "skills":         { "type": "array", "items": { "type": "string" } },
+    "projects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name":        { "type": ["string", "null"] },
+          "description": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "certifications": { "type": "array", "items": { "type": "string" } }
+  }
+}

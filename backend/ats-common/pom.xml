@@ -44,6 +44,12 @@
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>s3</artifactId>
         </dependency>
+        <dependency>
+            <!-- ats-common now carries unit tests (SkillTaxonomyTest) -->
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <!-- No spring-boot-maven-plugin: this is a library jar, not an executable app. -->
