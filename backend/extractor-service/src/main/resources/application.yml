@@ -38,7 +38,7 @@ app:
       model: ${OLLAMA_MODEL:qwen2.5:3b}       # spec-locked default model
     groq:
       api-key: ${GROQ_API_KEY:}               # from .env via compose — never hardcoded
-      model: ${GROQ_MODEL:llama-3.1-8b-instant}
+      model: ${GROQ_MODEL:openai/gpt-oss-20b}   # Groq retired the llama-3.1 line; verified live 2026-09
     gemini:
       api-key: ${GEMINI_API_KEY:}
       model: ${GEMINI_MODEL:gemini-2.0-flash}

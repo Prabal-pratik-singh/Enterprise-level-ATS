@@ -203,6 +203,8 @@ services:
       OLLAMA_BASE_URL: http://ollama:11434       # in-network address of the ollama container
       LLM_READ_TIMEOUT_SECONDS: "180"            # CPU inference needs headroom (spec's 60s assumes cloud/GPU)
       GROQ_API_KEY: ${GROQ_API_KEY:-}            # values come from the gitignored .env
+      # Groq retires models over time — this default was verified against their live catalog
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       JAVA_OPTS: -XX:MaxRAMPercentage=75
     depends_on:
