@@ -5,9 +5,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
+import com.ats.util.Dates;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.stereotype.Component;
 
@@ -17,9 +16,6 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class ExperienceMath {
-
-    /** Tolerates "2021-03", "2021-3", "2021/03" and bare "2021" (assumes January). */
-    private static final Pattern YEAR_MONTH = Pattern.compile("(\\d{4})(?:[-/](\\d{1,2}))?");
 
     private record Interval(YearMonth start, YearMonth end) {
     }
@@ -33,7 +29,7 @@ public class ExperienceMath {
     public int totalExperienceMonths(JsonNode experienceArray, YearMonth now) {
         List<Interval> intervals = new ArrayList<>();
         for (JsonNode role : experienceArray) {
-            Optional<YearMonth> start = parseYearMonth(role.path("start_date").asText(null));
+            Optional<YearMonth> start = Dates.parseYearMonth(role.path("start_date").asText(null));
             if (start.isEmpty()) {
                 continue; // no readable start date -> this role can't be counted
             }
@@ -42,7 +38,7 @@ public class ExperienceMath {
             // Ongoing role (or no end date given): count up to "now"
             YearMonth end = current || endRaw == null || endRaw.isBlank()
                     ? now
-                    : parseYearMonth(endRaw).orElse(now);
+                    : Dates.parseYearMonth(endRaw).orElse(now);
             if (end.isAfter(now)) {
                 end = now; // claims into the future are clamped to today
             }
@@ -116,21 +112,5 @@ public class ExperienceMath {
 
     private static boolean hasText(JsonNode node) {
         return node != null && node.isTextual() && !node.asText().isBlank();
-    }
-
-    static Optional<YearMonth> parseYearMonth(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return Optional.empty();
-        }
-        Matcher m = YEAR_MONTH.matcher(raw.trim());
-        if (!m.find()) {
-            return Optional.empty();
-        }
-        int year = Integer.parseInt(m.group(1));
-        int month = m.group(2) != null ? Integer.parseInt(m.group(2)) : 1; // bare year -> January
-        if (year < 1950 || year > 2100 || month < 1 || month > 12) {
-            return Optional.empty(); // garbage years/months don't crash us, they just don't count
-        }
-        return Optional.of(YearMonth.of(year, month));
     }
 }
