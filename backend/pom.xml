@@ -20,6 +20,7 @@
         <module>api-service</module>
         <module>parser-service</module>
         <module>extractor-service</module>
+        <module>matcher-service</module>
     </modules>
 
     <properties>

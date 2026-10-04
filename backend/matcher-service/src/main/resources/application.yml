@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: matcher-service
+  main:
+    web-application-type: none
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5434/ats}
+    username: ${DB_USER:ats}
+    password: ${DB_PASSWORD:ats}
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: matcher-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      enable-auto-commit: false
+      # no max-poll-records tweak: scoring is sub-millisecond, batches are safe
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+
+app:
+  s3:
+    # unused by the matcher; present because the shared ats-common config
+    # constructs an S3 client in every service (it never connects unless used)
+    endpoint: ${S3_ENDPOINT:http://localhost:9000}
+    public-endpoint: ${S3_PUBLIC_ENDPOINT:http://localhost:9000}
+    access-key: ${S3_ACCESS_KEY:minioadmin}
+    secret-key: ${S3_SECRET_KEY:minioadmin}
+    bucket: ${S3_BUCKET:resumes}
