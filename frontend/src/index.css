@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+/* Brand tokens (spec): ink navy, marigold, light paper background.
+   Tailwind v4 turns these into utilities: bg-ink, text-marigold, ring-ink-100… */
+@theme {
+  --color-ink: #1C2A44;
+  --color-ink-700: #2A3B5E;
+  --color-ink-100: #E8EBF2;
+  --color-marigold: #E4952B;
+  --color-marigold-100: #FBEBD3;
+  --color-paper: #F6F7F9;
+}
+
+body {
+  @apply bg-paper text-ink antialiased;
+}
