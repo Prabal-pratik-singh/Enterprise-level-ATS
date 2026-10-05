@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import {
-  LayoutDashboard, Briefcase, ShieldAlert, Search, Activity,
-  Database, Settings, Rocket,
+  LayoutDashboard, Briefcase, Users, ShieldAlert, Search, Activity,
+  Database, Rocket,
 } from 'lucide-react'
 import Avatar from './Avatar'
 
@@ -10,6 +10,7 @@ import Avatar from './Avatar'
 const NAV = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', end: true },
   { to: '/jobs', icon: Briefcase, label: 'Jobs' },
+  { to: '/candidates', icon: Users, label: 'Candidates' },
   { icon: ShieldAlert, label: 'Review Queue', soon: 'Phase 6' },
   { icon: Search, label: 'Talent Search', soon: 'Phase 7' },
 ]
@@ -72,10 +73,6 @@ export default function Sidebar() {
             <span className="ml-auto text-[10px] text-dim/60">↗</span>
           </a>
         ))}
-        <div className={`${itemBase} cursor-default text-dim/60`}>
-          <Settings size={16} />
-          Settings
-        </div>
       </nav>
 
       {/* recruiter card pinned to the bottom (single-recruiter demo: no auth by design) */}

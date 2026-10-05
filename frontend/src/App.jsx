@@ -4,6 +4,7 @@ import Header from './components/Header'
 import Dashboard from './pages/Dashboard'
 import JobsPage from './pages/JobsPage'
 import CandidatesPage from './pages/CandidatesPage'
+import AllCandidatesPage from './pages/AllCandidatesPage'
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/jobs" element={<JobsPage />} />
+          <Route path="/candidates" element={<AllCandidatesPage />} />
           <Route path="/jobs/:jobId" element={<CandidatesPage />} />
         </Routes>
       </div>

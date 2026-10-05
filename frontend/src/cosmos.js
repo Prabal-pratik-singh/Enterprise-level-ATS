@@ -506,12 +506,11 @@ function initSpotlight(spot, grid) {
 // ---------- 3D card tilt ----------
 
 function initTilt() {
-  const TILT = 8 // degrees at the edge of a small card
+  const TILT = 10 // degrees at the edge of a small card
   let tilted = null
   const untilt = () => {
     if (tilted) {
-      tilted.style.setProperty('--rx', '0deg')
-      tilted.style.setProperty('--ry', '0deg')
+      tilted.style.transform = '' // fall back to the stylesheet's resting state
       tilted = null
     }
   }
@@ -527,8 +526,11 @@ function initTilt() {
       const damp = Math.min(1, 420 / Math.max(r.width, r.height))
       const px = (e.clientX - r.left) / r.width - 0.5
       const py = (e.clientY - r.top) / r.height - 0.5
-      card.style.setProperty('--rx', `${(-py * TILT * damp).toFixed(2)}deg`)
-      card.style.setProperty('--ry', `${(px * TILT * damp).toFixed(2)}deg`)
+      // INLINE transform: wins against every stylesheet rule, so the tilt can
+      // never be lost to a cascade/layer accident again
+      card.style.transform =
+        `perspective(900px) rotateX(${(-py * TILT * damp).toFixed(2)}deg)` +
+        ` rotateY(${(px * TILT * damp).toFixed(2)}deg) translateZ(6px)`
     },
     { passive: true },
   )

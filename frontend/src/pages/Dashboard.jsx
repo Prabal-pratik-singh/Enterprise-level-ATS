@@ -98,12 +98,13 @@ export default function Dashboard() {
 
   if (error) return <p className="text-rose-400">{error}</p>
 
+  // every KPI card is a door: it links to the view that explains its number
   const kpis = [
-    { label: 'Active jobs', value: jobs.length, icon: Briefcase, spark: jobs.map((j) => j.applicants) },
-    { label: 'Total candidates', value: rows.length, icon: Users, spark: stats.sortedScores },
-    { label: 'Scored', value: stats.scored.length, icon: Gauge, spark: stats.sortedScores },
-    { label: 'Strong matches (80+)', value: stats.strong.length, icon: Trophy, spark: stats.sortedScores.filter((s) => s >= 60) },
-    { label: 'Awaiting decision', value: stats.undecided.length, icon: UserCheck, spark: stats.sortedScores.slice(-8) },
+    { label: 'Active jobs', value: jobs.length, icon: Briefcase, spark: jobs.map((j) => j.applicants), to: '/jobs' },
+    { label: 'Total candidates', value: rows.length, icon: Users, spark: stats.sortedScores, to: '/candidates' },
+    { label: 'Scored', value: stats.scored.length, icon: Gauge, spark: stats.sortedScores, to: '/candidates?f=scored' },
+    { label: 'Strong matches (80+)', value: stats.strong.length, icon: Trophy, spark: stats.sortedScores.filter((s) => s >= 60), to: '/candidates?f=strong' },
+    { label: 'Awaiting decision', value: stats.undecided.length, icon: UserCheck, spark: stats.sortedScores.slice(-8), to: '/candidates?f=awaiting' },
   ]
 
   return (
@@ -123,25 +124,29 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      {/* KPI cards */}
+      {/* KPI cards — clickable: each opens the filtered view behind its number */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        {kpis.map(({ label, value, icon: Icon, spark }) => (
-          <div key={label} className="card p-4">
+        {kpis.map(({ label, value, icon: Icon, spark, to }) => (
+          <Link key={label} to={to} className="card group block p-4">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-dim">{label}</span>
+              <span className="text-xs text-dim transition group-hover:text-ink">{label}</span>
               <span className="rounded-lg bg-white/5 p-1.5 ring-1 ring-white/10">
                 <Icon size={14} className="text-cyan" />
               </span>
             </div>
             <div className="mt-1 text-3xl font-semibold tabular-nums">{value}</div>
-            <Sparkline values={spark} />
-          </div>
+            <div className="flex items-end justify-between">
+              <Sparkline values={spark} />
+              <ArrowRight size={13} className="mb-1 text-dim opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
+            </div>
+          </Link>
         ))}
       </div>
 
       {/* pipeline board + right column — minmax(0,1fr) lets the board SHRINK
-          instead of shoving the insights panel off-screen */}
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+          instead of shoving the insights panel off-screen; items-start stops
+          the board stretching into a tall empty slab */}
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         {/* pipeline — the real state machine as kanban columns */}
         <div className="card min-w-0 p-5">
           <div className="mb-4 flex items-center justify-between">
@@ -160,10 +165,12 @@ export default function Dashboard() {
                 .sort((a, b) => (b.finalScore ?? -1) - (a.finalScore ?? -1))
               return (
                 <div key={stage.key} className="w-44 shrink-0">
-                  <div className="mb-2 flex items-center justify-between px-1">
+                  {/* column header links to the all-candidates view, pre-filtered */}
+                  <Link to={`/candidates?f=status:${stage.key}`}
+                        className="mb-2 flex items-center justify-between rounded-lg px-1 py-0.5 transition hover:bg-white/5">
                     <span className={`text-xs font-medium ${stage.accent}`}>{stage.label}</span>
                     <span className="text-xs tabular-nums text-dim">{stageRows.length}</span>
-                  </div>
+                  </Link>
                   <div className={`h-0.5 rounded-full ${stage.bar} opacity-60 mb-2`} />
                   <div className="space-y-2">
                     {stageRows.slice(0, 3).map((row) => (
@@ -189,7 +196,10 @@ export default function Dashboard() {
                       </div>
                     )}
                     {stageRows.length > 3 && (
-                      <div className="px-1 text-[10px] text-dim/70">+{stageRows.length - 3} more</div>
+                      <Link to={`/candidates?f=status:${stage.key}`}
+                            className="block px-1 text-[10px] text-dim/70 transition hover:text-cyan">
+                        +{stageRows.length - 3} more →
+                      </Link>
                     )}
                   </div>
                 </div>
