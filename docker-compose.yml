@@ -220,6 +220,25 @@ services:
     # no ports/healthcheck: worker. Start ollama first: docker compose --profile llm up -d
     mem_limit: 768m
 
+  matcher:
+    build:
+      context: ./backend
+      dockerfile: matcher-service/Dockerfile
+    image: ats/matcher-service
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ats}
+      DB_USER: ${POSTGRES_USER:-ats}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-ats}
+      JAVA_OPTS: -XX:MaxRAMPercentage=75
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    # no S3 env needed: matcher reads/writes Postgres only (yml carries safe defaults)
+    mem_limit: 640m
+
   # ---------- Phase 7: docker compose --profile search up -d ----------
   opensearch:
     image: opensearchproject/opensearch:2.19.1
