@@ -73,14 +73,23 @@ public class CandidateQueryService {
                 rs.getString("full_name"),
                 rs.getString("email"),
                 rs.getString("status"),
-                (Double) rs.getObject("final_score"),
+                dbl(rs.getObject("final_score")),
                 parseJson(rs.getString("components")),
-                (Double) rs.getObject("fraud_score"),
+                dbl(rs.getObject("fraud_score")),
                 parseJson(rs.getString("flags")),
-                (Integer) rs.getObject("total_months"),
+                intOrNull(rs.getObject("total_months")),
                 rs.getString("seniority"),
-                (Double) rs.getObject("completeness"),
+                dbl(rs.getObject("completeness")),
                 rs.getBoolean("knocked_out"));
+    }
+
+    /** Postgres `numeric` arrives as BigDecimal — never cast, always convert. */
+    private static Double dbl(Object value) {
+        return value == null ? null : ((Number) value).doubleValue();
+    }
+
+    private static Integer intOrNull(Object value) {
+        return value == null ? null : ((Number) value).intValue();
     }
 
     private JsonNode parseJson(String json) {
