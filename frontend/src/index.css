@@ -33,16 +33,22 @@
   --stars-opacity: 1;
 }
 
-html,
-body {
+html {
+  /* solid dark floor: whatever scrolling/zoom does to the gradient above it,
+     white can never peek through. color-scheme darkens scrollbars/form chrome. */
+  background: #05060f;
+  color-scheme: dark;
   min-height: 100%;
+  overscroll-behavior: none;
 }
 
 body {
   @apply text-ink antialiased;
+  min-height: 100%;
   background:
     radial-gradient(120% 90% at 20% 0%, #0d1128 0%, #070a18 55%, #05060f 100%);
   background-attachment: fixed;
+  background-color: #05060f; /* fallback under the gradient */
 }
 
 /* the app sits above the sky */
@@ -88,6 +94,18 @@ body {
     background: rgba(255, 255, 255, 0.07);
     backdrop-filter: blur(26px) saturate(150%);
     -webkit-backdrop-filter: blur(26px) saturate(150%);
+  }
+
+  /* dropdown menus: NEAR-OPAQUE on purpose. backdrop-filter silently no-ops
+     inside another backdrop-filtered ancestor (the glass header), so a glass
+     popover would be unreadably transparent. Menus also must not tilt. */
+  .popover {
+    background: rgba(13, 17, 40, 0.97);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 14px;
+    box-shadow:
+      0 24px 70px rgba(0, 0, 0, 0.6),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
 }
 

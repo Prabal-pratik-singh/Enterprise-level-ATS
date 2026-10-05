@@ -62,7 +62,7 @@ export default function Header() {
           <Bell size={17} />
         </button>
         {open === 'bell' && (
-          <div className="card card-strong absolute right-0 top-11 w-72 p-4 !rounded-xl">
+          <div className="popover absolute right-0 top-11 w-72 p-4">
             <div className="mb-1 text-sm font-medium">Notifications</div>
             <p className="text-xs text-dim">
               Quiet for now — recruiter notifications ride the <code className="text-cyan">shortlist.updated</code> topic
@@ -83,7 +83,7 @@ export default function Header() {
           <ChevronDown size={14} className={`text-dim transition ${open === 'profile' ? 'rotate-180' : ''}`} />
         </button>
         {open === 'profile' && (
-          <div className="card card-strong absolute right-0 top-12 w-60 p-2 !rounded-xl">
+          <div className="popover absolute right-0 top-12 w-60 p-2">
             <div className="px-3 py-2 text-xs text-dim">
               Single-recruiter demo — no auth by design (see README).
             </div>
