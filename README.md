@@ -137,3 +137,20 @@ presigned PUTs so resume bytes never transit the API.
   config because providers retire them, and `max-poll-records=1` keeps slow
   LLM calls inside Kafka's poll deadline. One stubborn resume that failed on
   two models was rescued by a third — pluggability as resilience, live.
+
+### Phase 5 — Scoring engine + Recruiter Dashboard v1 (first full end-to-end demo)
+- `matcher-service` scores every extracted profile against its job: six
+  explainable components (skill match with **recency decay**, experience fit,
+  project relevance, education, certifications, resume quality) blended by
+  weights that **shift for fresher-friendly jobs** (experience's weight flows
+  to projects/education). Missing must-have skills don't just lower a number —
+  they **cap the final score**; hopeless mismatches are knocked out but stay
+  visible. Every verdict ships with human-readable evidence chips.
+- The React dashboard (Vite + Tailwind, ink-navy/marigold) shows the ranked
+  table with component bars, a full report drawer (evidence, profile, audit
+  timeline) and shortlist/reject buttons; new candidates **stream in live over
+  SSE** as the matcher scores them — api-service relays `application.scored`
+  events to open browser connections.
+- A satisfying accident of honest data: the two planted fraud resumes rank
+  #1 and #2 on the backend job (hidden keyword stuffing inflates skill match).
+  Phase 6's Trust Service exists to take them down.
