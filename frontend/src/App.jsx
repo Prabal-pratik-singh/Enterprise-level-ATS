@@ -1,24 +1,25 @@
-import { Routes, Route, Link } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
+import Sidebar from './components/Sidebar'
+import Header from './components/Header'
+import Dashboard from './pages/Dashboard'
 import JobsPage from './pages/JobsPage'
 import CandidatesPage from './pages/CandidatesPage'
 
 export default function App() {
   return (
     <div className="min-h-screen">
-      <header className="bg-ink text-white shadow">
-        <div className="mx-auto max-w-6xl px-6 py-4 flex items-baseline gap-3">
-          <Link to="/" className="text-xl font-semibold tracking-tight">
-            ATS<span className="text-marigold">Pipeline</span>
-          </Link>
-          <span className="text-xs text-white/50">event-driven screening demo</span>
+      <Sidebar />
+      {/* content clears the fixed sidebar (w-56 + left-4 + gap) */}
+      <div className="pl-[16.5rem] pr-4 pt-4 pb-10">
+        <div className="mx-auto max-w-6xl">
+          <Header />
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/jobs" element={<JobsPage />} />
+            <Route path="/jobs/:jobId" element={<CandidatesPage />} />
+          </Routes>
         </div>
-      </header>
-      <main className="mx-auto max-w-6xl px-6 py-8">
-        <Routes>
-          <Route path="/" element={<JobsPage />} />
-          <Route path="/jobs/:jobId" element={<CandidatesPage />} />
-        </Routes>
-      </main>
+      </div>
     </div>
   )
 }

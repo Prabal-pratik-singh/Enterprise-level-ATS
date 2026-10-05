@@ -17,12 +17,13 @@ export default function ScoreBars({ components, compact = false }) {
         const value = components[key] ?? 0
         return (
           <div key={key} className="flex items-center gap-2">
-            {!compact && <span className="w-24 text-xs text-ink/60">{label}</span>}
-            <div className={`${compact ? 'h-1.5' : 'h-2'} flex-1 rounded-full bg-ink-100 overflow-hidden`}
+            {!compact && <span className="w-24 text-xs text-dim">{label}</span>}
+            <div className={`${compact ? 'h-1' : 'h-1.5'} flex-1 rounded-full bg-white/10 overflow-hidden`}
                  title={`${label}: ${(value * 100).toFixed(0)}%`}>
-              <div className="h-full rounded-full bg-marigold" style={{ width: `${value * 100}%` }} />
+              <div className="h-full rounded-full bg-gradient-to-r from-cyan to-violet"
+                   style={{ width: `${value * 100}%` }} />
             </div>
-            {!compact && <span className="w-8 text-right text-xs tabular-nums">{(value * 100).toFixed(0)}</span>}
+            {!compact && <span className="w-8 text-right text-xs tabular-nums text-ink/90">{(value * 100).toFixed(0)}</span>}
           </div>
         )
       })}

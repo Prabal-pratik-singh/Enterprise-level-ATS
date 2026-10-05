@@ -1,12 +1,16 @@
-import { useCallback, useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { api } from '../api'
+import Avatar from '../components/Avatar'
 import ScoreBars from '../components/ScoreBars'
 import StatusChip from '../components/StatusChip'
 import CandidateDrawer from '../components/CandidateDrawer'
 
 export default function CandidatesPage() {
   const { jobId } = useParams()
+  const [params] = useSearchParams()
+  const query = (params.get('q') || '').toLowerCase()
+
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
   const [selected, setSelected] = useState(null)       // applicationId of the open drawer
@@ -45,56 +49,70 @@ export default function CandidatesPage() {
   const updateRowStatus = (applicationId, status) =>
     setRows((current) => current.map((r) => (r.applicationId === applicationId ? { ...r, status } : r)))
 
-  if (error) return <p className="text-red-600">{error}</p>
+  // header search lands here as ?q= — filter client-side by name/email
+  const visible = useMemo(() => {
+    if (!query) return rows
+    return rows.filter((r) =>
+      r.name?.toLowerCase().includes(query) || r.email?.toLowerCase().includes(query))
+  }, [rows, query])
+
+  if (error) return <p className="text-rose-400">{error}</p>
 
   return (
     <div>
-      <div className="flex items-baseline justify-between mb-6">
-        <h1 className="text-2xl font-semibold">
-          Ranked candidates <span className="text-ink/50 text-base">({total})</span>
+      <div className="mb-6 flex items-baseline justify-between">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Ranked candidates <span className="text-base text-dim">({query ? `${visible.length} of ${total}` : total})</span>
         </h1>
-        <Link to="/" className="text-sm text-marigold hover:underline">← all jobs</Link>
+        <Link to="/" className="text-sm text-cyan hover:underline">← dashboard</Link>
       </div>
 
-      <div className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-ink-100">
+      <div className="card overflow-hidden !rounded-2xl">
         <table className="w-full text-sm">
-          <thead className="bg-ink text-white text-left">
-            <tr>
-              <th className="px-4 py-3 w-10">#</th>
-              <th className="px-4 py-3">Candidate</th>
-              <th className="px-4 py-3 w-20">Score</th>
-              <th className="px-4 py-3 w-44">Breakdown</th>
-              <th className="px-4 py-3 w-28">Experience</th>
-              <th className="px-4 py-3 w-32">Status</th>
+          <thead className="text-left text-[11px] uppercase tracking-wider text-dim">
+            <tr className="border-b border-white/10 bg-white/5">
+              <th className="px-4 py-3 w-10 font-medium">#</th>
+              <th className="px-4 py-3 font-medium">Candidate</th>
+              <th className="px-4 py-3 w-20 font-medium">Score</th>
+              <th className="px-4 py-3 w-44 font-medium">Breakdown</th>
+              <th className="px-4 py-3 w-28 font-medium">Experience</th>
+              <th className="px-4 py-3 w-32 font-medium">Status</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, index) => (
+            {visible.map((row, index) => (
               <tr key={row.applicationId}
                   onClick={() => setSelected(row.applicationId)}
-                  className={`border-t border-ink-100 cursor-pointer hover:bg-marigold-100/40 transition
-                              ${freshIds.has(row.applicationId) ? 'bg-marigold-100' : ''}`}>
-                <td className="px-4 py-3 text-ink/50 tabular-nums">{index + 1}</td>
+                  className={`cursor-pointer border-t border-white/5 transition hover:bg-white/5
+                              ${freshIds.has(row.applicationId) ? 'bg-marigold/10' : ''}`}>
+                <td className="px-4 py-3 tabular-nums text-dim">{index + 1}</td>
                 <td className="px-4 py-3">
-                  <div className="font-medium">{row.name}</div>
-                  <div className="text-xs text-ink/50">{row.email}</div>
+                  <div className="flex items-center gap-3">
+                    <Avatar name={row.name} size={32} />
+                    <div className="leading-tight">
+                      <div className="font-medium">{row.name}</div>
+                      <div className="text-xs text-dim">{row.email}</div>
+                    </div>
+                  </div>
                 </td>
                 <td className="px-4 py-3">
-                  <span className={`text-lg font-semibold tabular-nums ${row.knockedOut ? 'text-red-500' : ''}`}>
+                  <span className={`text-lg font-semibold tabular-nums ${row.knockedOut ? 'text-rose-400' : 'text-marigold'}`}>
                     {row.finalScore != null ? Math.round(row.finalScore) : '—'}
                   </span>
                 </td>
                 <td className="px-4 py-3"><ScoreBars components={row.components} compact /></td>
-                <td className="px-4 py-3 text-ink/70">
+                <td className="px-4 py-3 text-ink/80">
                   {row.totalExperienceMonths != null ? `${row.totalExperienceMonths} mo` : '—'}
-                  {row.seniority && <span className="block text-xs text-ink/40">{row.seniority}</span>}
+                  {row.seniority && <span className="block text-xs text-dim">{row.seniority}</span>}
                 </td>
                 <td className="px-4 py-3"><StatusChip status={row.status} /></td>
               </tr>
             ))}
-            {rows.length === 0 && (
-              <tr><td colSpan="6" className="px-4 py-10 text-center text-ink/50">
-                No candidates yet — run <code className="text-marigold">./tools/seed.sh 5</code> and watch them appear live.
+            {visible.length === 0 && (
+              <tr><td colSpan="6" className="px-4 py-10 text-center text-dim">
+                {query
+                  ? <>No match for “{query}”.</>
+                  : <>No candidates yet — run <code className="text-marigold">./tools/seed.sh 5</code> and watch them appear live.</>}
               </td></tr>
             )}
           </tbody>
