@@ -139,10 +139,11 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* pipeline board + right column */}
-      <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
+      {/* pipeline board + right column — minmax(0,1fr) lets the board SHRINK
+          instead of shoving the insights panel off-screen */}
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         {/* pipeline — the real state machine as kanban columns */}
-        <div className="card p-5">
+        <div className="card min-w-0 p-5">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <h2 className="font-semibold">Recruitment pipeline</h2>

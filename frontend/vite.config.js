@@ -9,6 +9,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     port: 5174,
+    strictPort: true, // never silently hop ports — fail loudly if 5174 is taken
     proxy: {
       '/api': { target: 'http://localhost:8082', changeOrigin: true },
     },
