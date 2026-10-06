@@ -21,10 +21,18 @@ export default function AllCandidatesPage() {
   const [params, setParams] = useSearchParams()
   const filterKey = params.get('f') || 'all'
   const query = (params.get('q') || '').toLowerCase()
+  // drawer state lives in the URL (?app=…) so the Live Flow page — or a pasted
+  // link — can open a specific application directly
+  const selected = params.get('app')
+  const openApp = (id) => {
+    const next = new URLSearchParams(params)
+    if (id) next.set('app', id)
+    else next.delete('app')
+    setParams(next)
+  }
 
   const [rows, setRows] = useState([])
   const [jobs, setJobs] = useState([])
-  const [selected, setSelected] = useState(null)
   const [freshIds, setFreshIds] = useState(new Set())
   const [error, setError] = useState(null)
 
@@ -110,12 +118,12 @@ export default function AllCandidatesPage() {
         )}
       </div>
 
-      <CandidateTable rows={visible} freshIds={freshIds} onSelect={setSelected} showJob
+      <CandidateTable rows={visible} freshIds={freshIds} onSelect={openApp} showJob
                       emptyMessage="No candidates match this filter." />
 
       {selected && (
         <CandidateDrawer applicationId={selected}
-                         onClose={() => setSelected(null)}
+                         onClose={() => openApp(null)}
                          onDecision={updateRowStatus} />
       )}
     </div>
