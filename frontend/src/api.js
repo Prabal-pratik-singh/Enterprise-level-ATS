@@ -19,5 +19,6 @@ export const api = {
       body: JSON.stringify({ decision, reason }),
     }),
   stats: (jobId) => request(`/api/stats/pipeline${jobId ? `?jobId=${jobId}` : ''}`),
+  failures: (jobId) => request(`/api/stats/failures${jobId ? `?jobId=${jobId}` : ''}`),
   lag: () => request('/api/admin/lag'),
 }

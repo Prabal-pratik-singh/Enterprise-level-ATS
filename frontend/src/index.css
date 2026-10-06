@@ -254,6 +254,18 @@ body {
   to { left: calc(100% + 2px); }
 }
 
+/* vertical variant — dots fall down the Live Flow waterfall */
+.flow-dot-v {
+  top: -6px;
+  animation-name: flow-down;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+@keyframes flow-down {
+  from { top: -6px; }
+  to { top: calc(100% + 2px); }
+}
+
 /* ============ chrome ============ */
 ::-webkit-scrollbar {
   width: 10px;
