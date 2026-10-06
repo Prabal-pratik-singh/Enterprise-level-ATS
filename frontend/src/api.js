@@ -18,4 +18,6 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ decision, reason }),
     }),
+  stats: (jobId) => request(`/api/stats/pipeline${jobId ? `?jobId=${jobId}` : ''}`),
+  lag: () => request('/api/admin/lag'),
 }

@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import {
-  LayoutDashboard, Briefcase, Users, ShieldAlert, Search, Activity,
+  LayoutDashboard, Briefcase, Users, Workflow, ShieldAlert, Search, Activity,
   Database, Rocket,
 } from 'lucide-react'
 import Avatar from './Avatar'
@@ -11,6 +11,7 @@ const NAV = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', end: true },
   { to: '/jobs', icon: Briefcase, label: 'Jobs' },
   { to: '/candidates', icon: Users, label: 'Candidates' },
+  { to: '/flow', icon: Workflow, label: 'Live Flow' },
   { icon: ShieldAlert, label: 'Review Queue', soon: 'Phase 6' },
   { icon: Search, label: 'Talent Search', soon: 'Phase 7' },
 ]

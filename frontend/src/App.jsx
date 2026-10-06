@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard'
 import JobsPage from './pages/JobsPage'
 import CandidatesPage from './pages/CandidatesPage'
 import AllCandidatesPage from './pages/AllCandidatesPage'
+import FlowPage from './pages/FlowPage'
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/jobs" element={<JobsPage />} />
           <Route path="/candidates" element={<AllCandidatesPage />} />
+          <Route path="/flow" element={<FlowPage />} />
           <Route path="/jobs/:jobId" element={<CandidatesPage />} />
         </Routes>
       </div>
