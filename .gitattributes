@@ -3,3 +3,5 @@
 * text=auto
 *.sh text eol=lf
 *.cmd text eol=crlf
+# Binary fixtures must never get line-ending conversion (it shifts PDF byte offsets).
+*.pdf binary
