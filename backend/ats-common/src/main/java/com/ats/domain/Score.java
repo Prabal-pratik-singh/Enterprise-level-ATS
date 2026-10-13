@@ -7,16 +7,20 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 /**
- * One scoring row per application. The matcher writes final_score/components/
- * evidence; the Phase 6 fraud service writes fraud_score/flags into the SAME
- * row (the spec's design) — hence separate mutators per writer.
+ * One scoring row per application, shared by TWO writers:
+ *  - matcher-service writes match_score / components / evidence
+ *  - fraud-service   writes fraud_score / flags / fraud_penalty
+ * final_score is computed by Postgres (V5 generated column) — read-only here.
  */
 @Entity
 @Table(name = "scores")
+@DynamicUpdate // UPDATE only the columns this service changed — without it JPA rewrites
+               // EVERY column and would silently erase the other service's half of the row
 public class Score {
 
     @Id
@@ -25,8 +29,16 @@ public class Score {
     @Column(name = "application_id", nullable = false, unique = true)
     private UUID applicationId;
 
-    @Column(name = "final_score")
-    private Double finalScore;     // 0..100, capped + weighted
+    @Column(name = "match_score")
+    private Double matchScore;     // 0..100 from the matcher (null until it has run)
+
+    @Column(name = "fraud_penalty", nullable = false)
+    private Double fraudPenalty;   // points subtracted by the Trust Service
+
+    // Computed by Postgres as match_score - fraud_penalty; JPA must never send it
+    // (Postgres rejects writes to a generated column).
+    @Column(name = "final_score", insertable = false, updatable = false)
+    private Double finalScore;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb", nullable = false)
@@ -58,14 +70,15 @@ public class Score {
         this.components = "{}";
         this.evidence = "[]";
         this.fraudScore = 0.0;   // innocent until Phase 6 says otherwise
+        this.fraudPenalty = 0.0;   // no penalty until the Trust Service says otherwise
         this.flags = "[]";
         this.createdAt = Instant.now();
         this.updatedAt = this.createdAt;
     }
 
     /** Matcher's write: the explainable match result (fraud fields untouched). */
-    public void updateMatch(double finalScore, String componentsJson, String evidenceJson) {
-        this.finalScore = finalScore;
+    public void updateMatch(double matchScore, String componentsJson, String evidenceJson) {
+        this.matchScore = matchScore;
         this.components = componentsJson;
         this.evidence = evidenceJson;
         this.updatedAt = Instant.now();
@@ -81,6 +94,14 @@ public class Score {
 
     public Double getFinalScore() {
         return finalScore;
+    }
+
+    public Double getMatchScore() {
+        return matchScore;
+    }
+
+    public Double getFraudPenalty() {
+        return fraudPenalty;
     }
 
     public String getComponents() {
