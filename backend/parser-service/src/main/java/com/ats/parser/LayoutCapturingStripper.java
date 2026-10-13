@@ -1,5 +1,11 @@
 package com.ats.parser;
 
+import org.apache.pdfbox.contentstream.operator.color.SetNonStrokingColor;
+import org.apache.pdfbox.contentstream.operator.color.SetNonStrokingColorN;
+import org.apache.pdfbox.contentstream.operator.color.SetNonStrokingColorSpace;
+import org.apache.pdfbox.contentstream.operator.color.SetNonStrokingDeviceCMYKColor;
+import org.apache.pdfbox.contentstream.operator.color.SetNonStrokingDeviceGrayColor;
+import org.apache.pdfbox.contentstream.operator.color.SetNonStrokingDeviceRGBColor;
 import org.apache.pdfbox.pdmodel.graphics.color.PDColor;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.pdfbox.text.TextPosition;
@@ -26,6 +32,18 @@ class LayoutCapturingStripper extends PDFTextStripper {
 
     LayoutCapturingStripper() {
         setSortByPosition(true); // read in visual order (top-to-bottom), not internal file order
+
+        // A PDF page is a list of drawing instructions ("operators"). PDFTextStripper
+        // only registers the TEXT ones and silently skips every "change the ink color"
+        // instruction — without these lines its current color stays the default black,
+        // so paintedNearWhite() can never fire. Text is painted with the FILL color,
+        // so we register the six instructions that can change it:
+        addOperator(new SetNonStrokingColorSpace(this));      // "cs"  pick a color space
+        addOperator(new SetNonStrokingColor(this));           // "sc"  set a color inside that space
+        addOperator(new SetNonStrokingColorN(this));          // "scn" same, but also patterns/spot colors
+        addOperator(new SetNonStrokingDeviceGrayColor(this)); // "g"   gray shortcut:  "1 g" = white
+        addOperator(new SetNonStrokingDeviceRGBColor(this));  // "rg"  RGB shortcut:   "1 1 1 rg" = white
+        addOperator(new SetNonStrokingDeviceCMYKColor(this)); // "k"   CMYK shortcut:  "0 0 0 0 k" = white
     }
 
     /** PDFBox calls this once per character it extracts — our inspection hook. */
