@@ -13,6 +13,7 @@ COPY api-service/pom.xml api-service/
 COPY parser-service/pom.xml parser-service/
 COPY extractor-service/pom.xml extractor-service/
 COPY matcher-service/pom.xml matcher-service/
+COPY fraud-service/pom.xml fraud-service/
 RUN mvn -q -B -pl parser-service -am dependency:go-offline
 # Only the sources we actually build: the shared library + this service
 COPY ats-common/src ats-common/src
