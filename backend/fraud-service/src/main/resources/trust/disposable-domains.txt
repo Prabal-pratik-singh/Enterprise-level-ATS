@@ -1,0 +1,22 @@
+# Throwaway-inbox providers (one domain per line; subdomains match too).
+# Production would sync a maintained list (e.g. the open-source "disposable-email-domains" project).
+mailinator.com
+guerrillamail.com
+guerrillamail.net
+sharklasers.com
+grr.la
+10minutemail.com
+temp-mail.org
+tempmail.com
+tempmail.dev
+yopmail.com
+trashmail.com
+getnada.com
+maildrop.cc
+dispostable.com
+throwawaymail.com
+fakeinbox.com
+mohmal.com
+emailondeck.com
+mintemail.com
+mailnesia.com

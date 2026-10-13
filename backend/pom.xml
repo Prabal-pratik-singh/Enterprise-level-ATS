@@ -21,6 +21,7 @@
         <module>parser-service</module>
         <module>extractor-service</module>
         <module>matcher-service</module>
+        <module>fraud-service</module>
     </modules>
 
     <properties>
