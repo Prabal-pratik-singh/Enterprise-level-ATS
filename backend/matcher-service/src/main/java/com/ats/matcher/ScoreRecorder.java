@@ -52,22 +52,31 @@ public class ScoreRecorder {
         Application app = applications.findById(event.applicationId())
                 .orElseThrow(() -> new IllegalStateException("application not found: " + event.applicationId()));
 
-        // Upsert: a re-score (resume v2, replayed event) updates in place
+        // Upsert: a re-score (resume v2, replayed event) updates in place.
+        // We write only the MATCH half; Postgres derives final_score from it.
         Score score = scores.findByApplicationId(app.getId()).orElseGet(() -> new Score(app.getId()));
         score.updateMatch(card.finalScore(), json(card.components()), json(card.evidence()));
         scores.save(score);
 
-        app.transitionTo(ApplicationStatus.SCORED);
+        // Move forward only from EXTRACTED (or SCORED, for a re-score). If the Trust
+        // Service already flagged this application, or a human already decided, the
+        // score still updates but the status is NOT overwritten.
+        ApplicationStatus before = app.getStatus();
+        boolean advance = before == ApplicationStatus.EXTRACTED || before == ApplicationStatus.SCORED;
+        if (advance) {
+            app.transitionTo(ApplicationStatus.SCORED);
+        }
         auditTrail.save(new ApplicationEvent(app.getId(), "SCORED", json(Map.of(
-                "final_score", card.finalScore(),
+                "match_score", card.finalScore(),
                 "knocked_out", card.knockedOut(),
-                "must_have_cap", card.mustHaveCap()))));
+                "must_have_cap", card.mustHaveCap(),
+                "status_kept", advance ? "" : before.name()))));   // e.g. "FLAGGED_FOR_REVIEW"
 
         // The api-service listens to this for SSE pushes; Phase 7's indexer joins later.
         outbox.append(Topics.APPLICATION_SCORED, app.getId(), app.getJobId(), Map.of(
                 "score_id", score.getId().toString(),
                 "candidate_id", app.getCandidateId().toString(),
-                "final_score", card.finalScore(),
+                "match_score", card.finalScore(),
                 "knocked_out", card.knockedOut()));
     }
 
