@@ -73,6 +73,8 @@ public class RecruiterController {
         scores.findByApplicationId(applicationId).ifPresent(s -> {
             report.put("evidence", readTree(s.getEvidence()));
             report.put("components", readTree(s.getComponents()));
+            report.put("match_score", s.getMatchScore());
+            report.put("fraud_penalty", s.getFraudPenalty());   // match_score - fraud_penalty = final score
             report.put("fraud_score", s.getFraudScore());
             report.put("flags", readTree(s.getFlags()));
         });

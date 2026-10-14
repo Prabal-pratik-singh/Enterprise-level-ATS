@@ -20,14 +20,15 @@ public class CandidateQueryService {
 
     /** One row of the ranked table (also the SSE push payload). */
     public record CandidateRow(UUID applicationId, String name, String email, String status,
-                               Double finalScore, JsonNode components, Double fraudScore,
+                               Double finalScore, Double matchScore, Double fraudPenalty, // match - penalty = final
+                               JsonNode components, Double fraudScore,
                                JsonNode flags, Integer totalExperienceMonths, String seniority,
                                Double completeness, boolean knockedOut) {
     }
 
     private static final String BASE_SELECT = """
             select a.id as application_id, c.full_name, c.email, a.status,
-                   s.final_score, s.components, s.fraud_score, s.flags, s.evidence,
+                   s.final_score, s.match_score, s.fraud_penalty, s.components, s.fraud_score, s.flags, s.evidence,
                    p.completeness,
                    (p.profile->'derived'->>'total_experience_months')::int as total_months,
                    p.profile->'derived'->>'seniority' as seniority,
@@ -56,6 +57,14 @@ public class CandidateQueryService {
                 rowMapper(), jobId, size, page * size);
     }
 
+    /** The Review Queue: everything waiting on a human fraud verdict, most suspicious first. */
+    public List<CandidateRow> flagged(UUID jobId) {   // jobId null = all jobs
+        return jdbc.query(BASE_SELECT + """
+                        where a.status = 'FLAGGED_FOR_REVIEW' and (?::uuid is null or a.job_id = ?::uuid)
+                        order by s.fraud_score desc, a.created_at asc
+                        """, rowMapper(), jobId, jobId);
+    }
+
     public long countForJob(UUID jobId) {
         Long n = jdbc.queryForObject("select count(*) from applications where job_id = ?", Long.class, jobId);
         return n == null ? 0 : n;
@@ -74,6 +83,8 @@ public class CandidateQueryService {
                 rs.getString("email"),
                 rs.getString("status"),
                 dbl(rs.getObject("final_score")),
+                dbl(rs.getObject("match_score")),
+                dbl(rs.getObject("fraud_penalty")),
                 parseJson(rs.getString("components")),
                 dbl(rs.getObject("fraud_score")),
                 parseJson(rs.getString("flags")),
