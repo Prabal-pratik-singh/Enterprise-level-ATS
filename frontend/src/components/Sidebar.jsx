@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
+import { api } from '../api'
 import {
   LayoutDashboard, Briefcase, Users, Workflow, ShieldAlert, Search, Activity,
   Database, Rocket,
@@ -12,7 +14,7 @@ const NAV = [
   { to: '/jobs', icon: Briefcase, label: 'Jobs' },
   { to: '/candidates', icon: Users, label: 'Candidates' },
   { to: '/flow', icon: Workflow, label: 'Live Flow' },
-  { icon: ShieldAlert, label: 'Review Queue', soon: 'Phase 6' },
+  { to: '/review', icon: ShieldAlert, label: 'Review Queue', badge: 'review' },
   { icon: Search, label: 'Talent Search', soon: 'Phase 7' },
 ]
 
@@ -24,6 +26,15 @@ const INFRA = [
 const itemBase = 'flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors'
 
 export default function Sidebar() {
+  // waiting fraud verdicts — a small poll keeps the badge honest on every page
+  const [reviewCount, setReviewCount] = useState(0)
+  useEffect(() => {
+    const tick = () => api.reviewQueue().then((q) => setReviewCount(q.length)).catch(() => {})
+    tick()
+    const id = setInterval(tick, 15000)
+    return () => clearInterval(id)
+  }, [])
+
   return (
     <aside className="card card-strong fixed left-4 top-4 bottom-4 z-10 flex w-56 flex-col p-4 !rounded-2xl">
       {/* logo */}
@@ -39,7 +50,7 @@ export default function Sidebar() {
 
       {/* navigation */}
       <nav className="flex flex-col gap-1">
-        {NAV.map(({ to, icon: Icon, label, soon, end }) =>
+        {NAV.map(({ to, icon: Icon, label, soon, end, badge }) =>
           to ? (
             <NavLink key={label} to={to} end={end}
               className={({ isActive }) =>
@@ -48,6 +59,11 @@ export default function Sidebar() {
                   : 'text-dim hover:text-ink hover:bg-white/5'}`}>
               <Icon size={16} />
               {label}
+              {badge === 'review' && reviewCount > 0 && (
+                <span className="ml-auto rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-amber-300 ring-1 ring-amber-400/30">
+                  {reviewCount}
+                </span>
+              )}
             </NavLink>
           ) : (
             <div key={label} className={`${itemBase} cursor-default text-dim/60`}>
