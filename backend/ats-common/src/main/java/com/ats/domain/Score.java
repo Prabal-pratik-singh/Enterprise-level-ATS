@@ -84,6 +84,14 @@ public class Score {
         this.updatedAt = Instant.now();
     }
 
+    /** Trust Service's write: fraud verdict + points to subtract (match fields untouched). */
+    public void updateTrust(double fraudScore, double penalty, String flagsJson) {
+        this.fraudScore = fraudScore;
+        this.fraudPenalty = penalty;   // Postgres re-derives final_score = match_score - penalty
+        this.flags = flagsJson;
+        this.updatedAt = Instant.now();
+    }
+
     public UUID getId() {
         return id;
     }
