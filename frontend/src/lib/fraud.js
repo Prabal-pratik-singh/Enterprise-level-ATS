@@ -1,4 +1,4 @@
-import { EyeOff, CalendarX, History, MailWarning, ShieldAlert } from 'lucide-react'
+import { EyeOff, CalendarX, History, MailWarning, ShieldAlert, Files, ClipboardCopy, Repeat } from 'lucide-react'
 
 // Trust Service flag codes → short recruiter-facing label + icon.
 // The full sentence (flag.explanation) always comes from the backend.
@@ -8,6 +8,10 @@ const FLAG_META = {
   IMPOSSIBLE_EXPERIENCE: { label: 'Impossible experience', icon: CalendarX },
   TECH_ANACHRONISM: { label: 'Tech anachronism', icon: History },
   DISPOSABLE_EMAIL: { label: 'Throwaway email', icon: MailWarning },
+  // from the Dedup Service
+  DUPLICATE_FILE: { label: 'Duplicate file', icon: Files },
+  COPIED_CONTENT: { label: 'Copied work history', icon: ClipboardCopy },
+  REPEAT_APPLICANT: { label: 'Repeat applicant', icon: Repeat },
 }
 
 export const FLAG_THRESHOLD = 0.5 // mirrors TrustScorer.FLAG_THRESHOLD
