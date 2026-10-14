@@ -92,6 +92,12 @@ public class Score {
         this.updatedAt = Instant.now();
     }
 
+    /** A human cleared the flag: the points come back, the evidence (fraud_score, flags) stays. */
+    public void clearFraudPenalty() {
+        this.fraudPenalty = 0.0;
+        this.updatedAt = Instant.now();
+    }
+
     public UUID getId() {
         return id;
     }
