@@ -9,4 +9,7 @@ public interface ApplicationEventRepository extends JpaRepository<ApplicationEve
 
     /** The candidate's full audit timeline, oldest first (report endpoint). */
     List<ApplicationEvent> findByApplicationIdOrderByCreatedAtAsc(UUID applicationId);
+
+    /** Has this application ever had this event? (e.g. a human FRAUD_CLEARED verdict) */
+    boolean existsByApplicationIdAndEventType(UUID applicationId, String eventType);
 }
