@@ -32,6 +32,11 @@ public class ResumeExtractedDlqConsumer {
     @KafkaListener(topics = "resume.extracted.dlq", groupId = "matcher-service-dlq")
     public void handle(ConsumerRecord<String, String> record) {
         try {
+            // resume.extracted is fan-out, so the Trust Service's failures land in this SAME dlq topic.
+            // Spring stamps every dead letter with the consumer group that gave up on it.
+            if (!"matcher-service".equals(header(record, KafkaHeaders.DLT_ORIGINAL_CONSUMER_GROUP))) {
+                return; // not ours
+            }
             EventEnvelope event = mapper.readValue(record.value(), EventEnvelope.class);
             String error = header(record, KafkaHeaders.DLT_EXCEPTION_MESSAGE);
             recorder.recordFailure(event, error == null ? "unknown scoring failure" : error);
