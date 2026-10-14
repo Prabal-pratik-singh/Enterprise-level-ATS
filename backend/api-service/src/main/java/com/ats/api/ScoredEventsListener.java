@@ -9,7 +9,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 /**
- * api-service's ear on the pipeline: when the matcher announces a score, fetch
+ * api-service's ear on the pipeline: when the matcher scores or the Trust Service flags, fetch
  * the fresh row and push it to the job's SSE watchers. Group "api-sse" with
  * latest offsets — a live ticker must not replay history on restart. No
  * idempotency ledger either: pushing the same row twice is harmless UI noise.
@@ -29,9 +29,10 @@ public class ScoredEventsListener {
         this.hub = hub;
     }
 
-    @KafkaListener(topics = Topics.APPLICATION_SCORED, groupId = "api-sse",
+    // A flag changes the row (status + penalty) just like a score does — same push, same "candidate" event
+    @KafkaListener(topics = {Topics.APPLICATION_SCORED, Topics.APPLICATION_FLAGGED}, groupId = "api-sse",
             properties = "auto.offset.reset=latest")
-    public void onScored(String message) {
+    public void onRowChanged(String message) {
         try {
             EventEnvelope event = mapper.readValue(message, EventEnvelope.class);
             query.byApplicationId(event.applicationId())
