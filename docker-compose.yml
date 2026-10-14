@@ -274,6 +274,27 @@ services:
         condition: service_healthy
     mem_limit: 512m
 
+  # ---------- Phase 6: Dedup Service (exact file, contact, MinHash + LSH near-duplicates) ----------
+  dedup:
+    restart: unless-stopped   # come back by themselves after a reboot / Docker restart
+    build:
+      context: ./backend
+      dockerfile: dedup-service/Dockerfile
+    image: ats/dedup-service
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ats}
+      DB_USER: ${POSTGRES_USER:-ats}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-ats}
+      JAVA_OPTS: -XX:MaxRAMPercentage=75
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    # no S3 env needed: dedup reads/writes Postgres only (yml carries safe defaults)
+    mem_limit: 512m
+
   # ---------- Dashboard: React build served by nginx (http://localhost:5174) ----------
   frontend:
     restart: unless-stopped   # come back by themselves after a reboot / Docker restart
