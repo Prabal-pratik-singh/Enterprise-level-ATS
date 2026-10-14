@@ -30,6 +30,11 @@ public final class DuplicateFinder {
     /** One application as dedup sees it. clusterId/createdAt are only known for EARLIER ones. */
     public record Applicant(UUID applicationId, String name, String email, String phone,
                             String sha256, long[] signature, UUID clusterId, Instant createdAt) {
+
+        /** The signature is computed after loading — this hands back a copy that carries it. */
+        public Applicant withSignature(long[] sig) {
+            return new Applicant(applicationId, name, email, phone, sha256, sig, clusterId, createdAt);
+        }
     }
 
     /** One finding about the pair (me, other). */
