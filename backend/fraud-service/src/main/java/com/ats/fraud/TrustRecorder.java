@@ -1,7 +1,9 @@
 package com.ats.fraud;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.ats.domain.Application;
 import com.ats.domain.ApplicationEvent;
@@ -56,29 +58,38 @@ public class TrustRecorder {
         // Upsert. If the matcher creates the row at the very same moment, the unique
         // application_id makes one insert fail; Kafka retries 1s later and we update instead.
         Score score = scores.findByApplicationId(app.getId()).orElseGet(() -> new Score(app.getId()));
-        score.updateTrust(verdict.fraudScore(), verdict.penalty(), json(verdict.flags()));
+        // A human already said "false alarm"? That sticks — unless a NEW kind of evidence
+        // turned up that they never saw (e.g. dedup later finds the same file under another name).
+        boolean keepCleared = keepsHumanClearance(
+                auditTrail.existsByApplicationIdAndEventType(app.getId(), "FRAUD_CLEARED"),
+                flagCodes(score.getFlags()), verdict.flags());
+        boolean flagged = verdict.flagged() && !keepCleared;
+        double penalty = keepCleared ? 0.0 : verdict.penalty();
+        score.updateTrust(verdict.fraudScore(), penalty, json(verdict.flags()));
         scores.save(score);
 
         ApplicationStatus before = app.getStatus();
-        ApplicationStatus after = nextStatus(before, verdict.flagged(), score.getMatchScore() != null);
+        ApplicationStatus after = keepCleared ? before
+                : nextStatus(before, verdict.flagged(), score.getMatchScore() != null);
         if (after != before) {
             app.transitionTo(after);
         }
         List<String> codes = verdict.flags().stream().map(FraudFlag::code).toList();
         auditTrail.save(new ApplicationEvent(app.getId(), "TRUST_CHECKED", json(Map.of(
                 "fraud_score", verdict.fraudScore(),
-                "penalty", verdict.penalty(),
-                "flagged", verdict.flagged(),
+                "penalty", penalty,
+                "flagged", flagged,
                 "flags", codes,
-                "status_kept", after == before && verdict.flagged() ? before.name() : ""))));
+                "kept_human_clearance", keepCleared,
+                "status_kept", after == before && flagged ? before.name() : ""))));
 
-        if (verdict.flagged()) {
+        if (flagged) {
             // the api-service pushes this to the dashboard (Batch 3)
             outbox.append(Topics.APPLICATION_FLAGGED, app.getId(), app.getJobId(), Map.of(
                     "score_id", score.getId().toString(),
                     "candidate_id", app.getCandidateId().toString(),
                     "fraud_score", verdict.fraudScore(),
-                    "penalty", verdict.penalty(),
+                    "penalty", penalty,
                     "flags", codes));
         }
     }
@@ -97,6 +108,26 @@ public class TrustRecorder {
             return hasMatchScore ? ApplicationStatus.SCORED : ApplicationStatus.EXTRACTED;
         }
         return before;
+    }
+
+    /**
+     * A human clearance survives a re-check unless the new verdict carries a WEIGHTED flag
+     * code that was not on the application when the human decided (weight-0 notes don't count).
+     */
+    static boolean keepsHumanClearance(boolean humanCleared, Set<String> codesTheHumanSaw, List<FraudFlag> now) {
+        return humanCleared && now.stream()
+                .noneMatch(f -> f.weight() > 0 && !codesTheHumanSaw.contains(f.code()));
+    }
+
+    /** Flag codes currently stored on the score row (["HIDDEN_TEXT", ...]). */
+    private Set<String> flagCodes(String flagsJson) {
+        Set<String> codes = new HashSet<>();
+        try {
+            mapper.readTree(flagsJson == null ? "[]" : flagsJson).forEach(f -> codes.add(f.path("code").asText()));
+        } catch (Exception e) {
+            // unreadable history = treat as "the human saw nothing", which only makes re-flagging likelier
+        }
+        return codes;
     }
 
     @Transactional

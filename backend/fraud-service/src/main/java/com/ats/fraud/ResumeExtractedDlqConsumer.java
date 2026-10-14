@@ -47,6 +47,12 @@ public class ResumeExtractedDlqConsumer {
         }
     }
 
+    /** Same bookkeeping for re-checks triggered by the Dedup Service. */
+    @KafkaListener(topics = "application.deduped.dlq", groupId = "fraud-service-dlq")
+    public void handleDeduped(ConsumerRecord<String, String> record) {
+        handle(record); // same group filter, same audit — only the topic differs
+    }
+
     private static String header(ConsumerRecord<String, String> record, String name) {
         Header header = record.headers().lastHeader(name);
         return header == null ? null : new String(header.value(), StandardCharsets.UTF_8);
