@@ -20,13 +20,22 @@ const STAGES = [
   { key: 'SCORED', label: 'Scored', color: '#e4952b', desc: 'ranked, awaiting a human' },
 ]
 
-// the worker queue that sits AFTER each stage (index-aligned with STAGES[0..2])
-const QUEUES = ['parser-service', 'extractor-service', 'matcher-service']
-const QUEUE_LABEL = { 'parser-service': 'parser', 'extractor-service': 'extractor', 'matcher-service': 'matcher' }
+// the worker queue(s) AFTER each stage. Extracted fans out: matcher, dedup and the
+// Trust Service each read resume.extracted with their own consumer group, in parallel.
+const EDGES = [
+  ['parser-service'],
+  ['extractor-service'],
+  ['matcher-service', 'dedup-service', 'fraud-service'],
+]
+const QUEUES = EDGES.flat()
+const QUEUE_LABEL = {
+  'parser-service': 'parser', 'extractor-service': 'extractor',
+  'matcher-service': 'matcher', 'dedup-service': 'dedup', 'fraud-service': 'trust',
+}
 
 function StageNode({ stage, current, ever, pulse }) {
   return (
-    <div className={`card w-40 shrink-0 p-4 text-center transition ${pulse ? 'ring-2 ring-marigold/60' : ''}`}
+    <div className={`card w-32 shrink-0 p-4 text-center xl:w-36 transition ${pulse ? 'ring-2 ring-marigold/60' : ''}`}
          style={{ boxShadow: `0 20px 60px rgba(0,0,0,0.35), 0 0 24px ${stage.color}22` }}>
       <div className="text-xs font-medium" style={{ color: stage.color }}>{stage.label}</div>
       <div className="my-1 text-4xl font-semibold tabular-nums">{current}</div>
@@ -36,19 +45,24 @@ function StageNode({ stage, current, ever, pulse }) {
   )
 }
 
-/** The animated edge between two stages: worker name, lag badge, flowing dots. */
-function QueueEdge({ worker, lag }) {
-  const busy = lag > 0
+/**
+ * The animated edge between two stages: worker name, lag badge, flowing dots.
+ * lag === undefined means the API does not report this group (yet) — shown as "—",
+ * never as a reassuring but unproven "idle".
+ */
+function QueueEdge({ worker, lag, compact = false }) {
+  const known = lag !== undefined
+  const busy = known && lag > 0
   // more lag -> more dots, moving faster (capped so it never looks silly)
   const dots = busy ? Math.min(1 + Math.ceil(lag / 3), 5) : 1
   const duration = busy ? Math.max(0.7, 2.4 - lag * 0.08) : 6
 
   return (
-    <div className="flex w-28 shrink-0 flex-col items-center gap-1 self-center">
+    <div className={`flex w-full min-w-16 flex-col items-center self-center ${compact ? 'gap-0.5' : 'gap-1'}`}>
       <div className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] ring-1 transition
                        ${busy ? 'bg-marigold/15 text-marigold ring-marigold/40' : 'bg-white/5 text-dim ring-white/10'}`}>
         <Timer size={10} />
-        {busy ? `${lag} in queue` : 'idle'}
+        {!known ? '—' : busy ? `${lag} in queue` : 'idle'}
       </div>
       <div className="relative h-1 w-full overflow-hidden rounded-full bg-white/10">
         {Array.from({ length: dots }).map((_, i) => (
@@ -64,6 +78,16 @@ function QueueEdge({ worker, lag }) {
         ))}
       </div>
       <div className="text-[10px] text-dim/70">{QUEUE_LABEL[worker]}</div>
+    </div>
+  )
+}
+
+/** One edge column; several workers on the same topic stack up as parallel lanes. */
+function EdgeColumn({ workers, lag }) {
+  return (
+    <div className="flex min-w-20 flex-1 flex-col justify-center gap-2">
+      {workers.map((w) => <QueueEdge key={w} worker={w} lag={lag[w]} compact={workers.length > 1} />)}
+      {workers.length > 1 && <div className="text-center text-[9px] uppercase tracking-wider text-dim/50">in parallel</div>}
     </div>
   )
 }
@@ -124,7 +148,7 @@ export default function FlowPage() {
         const [pipelineStats, lagData] = await Promise.all([api.stats(jobId), api.lag()])
         if (!alive) return
         setStats(pipelineStats)
-        const byGroup = {}
+        const byGroup = {} // groups the API does not report stay undefined → "—"
         for (const q of lagData.queues || []) byGroup[q.group] = q.lag
         setLag(byGroup)
 
@@ -234,25 +258,31 @@ export default function FlowPage() {
       {error && <p className="mb-4 text-sm text-rose-400">{error}</p>}
 
       {/* the river: stages left to right, queues between them */}
+      {/* edges stretch (flex-1) so the river fits the card; on a narrow screen it scrolls instead */}
       <div className="card overflow-x-auto p-6">
-        <div className="flex min-w-max items-stretch gap-3">
+        <div className="flex min-w-[52rem] items-stretch gap-3">
           {STAGES.map((stage, i) => (
-            <div key={stage.key} className="flex items-stretch gap-3">
+            <div key={stage.key} className={`flex items-stretch gap-3 ${i < EDGES.length ? 'flex-1' : ''}`}>
               <StageNode stage={stage}
                          current={n(current, stage.key)}
                          ever={n(ever, stage.key)}
                          pulse={pulses[stage.key]} />
-              {i < QUEUES.length && <QueueEdge worker={QUEUES[i]} lag={lag[QUEUES[i]] || 0} />}
+              {i < EDGES.length && <EdgeColumn workers={EDGES[i]} lag={lag} />}
             </div>
           ))}
 
-          {/* terminal split: no Kafka here — a human makes this move */}
-          <div className="flex flex-col justify-center gap-2 self-stretch pl-2">
-            <div className={`card w-36 p-3 text-center transition ${pulses.SHORTLISTED ? 'ring-2 ring-emerald-400/60' : ''}`}>
+          {/* where applications end up: the Trust Service pulls some aside, a human decides the rest */}
+          <div className="flex shrink-0 flex-col justify-center gap-2 self-stretch pl-1">
+            <Link to="/review"
+                  className={`card block w-32 p-2.5 text-center transition hover:ring-1 hover:ring-amber-400/40 ${pulses.FLAGGED_FOR_REVIEW ? 'ring-2 ring-amber-400/60' : ''}`}>
+              <div className="text-xs font-medium text-amber-300">Flagged</div>
+              <div className="text-2xl font-semibold tabular-nums">{n(current, 'FLAGGED_FOR_REVIEW')}</div>
+            </Link>
+            <div className={`card w-32 p-2.5 text-center transition ${pulses.SHORTLISTED ? 'ring-2 ring-emerald-400/60' : ''}`}>
               <div className="text-xs font-medium text-emerald-400">Shortlisted</div>
               <div className="text-2xl font-semibold tabular-nums">{n(current, 'SHORTLISTED')}</div>
             </div>
-            <div className={`card w-36 p-3 text-center transition ${pulses.REJECTED ? 'ring-2 ring-rose-400/60' : ''}`}>
+            <div className={`card w-32 p-2.5 text-center transition ${pulses.REJECTED ? 'ring-2 ring-rose-400/60' : ''}`}>
               <div className="text-xs font-medium text-rose-400">Rejected</div>
               <div className="text-2xl font-semibold tabular-nums">{n(current, 'REJECTED')}</div>
             </div>
