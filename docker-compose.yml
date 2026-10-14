@@ -7,6 +7,7 @@ name: ats
 
 services:
   kafka:
+    restart: unless-stopped   # come back by themselves after a reboot / Docker restart
     image: apache/kafka:3.9.1
     # Demo simplification: run as root so the broker can write the fresh named
     # volume (the image's non-root user can't chown a new volume mountpoint).
@@ -46,6 +47,7 @@ services:
     mem_limit: 1g
 
   kafka-ui:
+    restart: unless-stopped   # come back by themselves after a reboot / Docker restart
     image: provectuslabs/kafka-ui:v0.7.2
     ports:
       - "8085:8080"
@@ -65,6 +67,7 @@ services:
     mem_limit: 768m
 
   postgres:
+    restart: unless-stopped   # come back by themselves after a reboot / Docker restart
     image: pgvector/pgvector:pg16
     ports:
       # Host port 5434 (5432/5433 belong to other local stacks); in-network it's postgres:5432
@@ -84,6 +87,7 @@ services:
     mem_limit: 1g
 
   minio:
+    restart: unless-stopped   # come back by themselves after a reboot / Docker restart
     # Pinned to the last community build that ships the full web console
     # (later releases stripped it; the demo browses uploaded objects in it).
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z
@@ -119,6 +123,7 @@ services:
     restart: "no"
 
   api:
+    restart: unless-stopped   # come back by themselves after a reboot / Docker restart
     build:
       context: ./backend
       dockerfile: api-service/Dockerfile
@@ -156,6 +161,7 @@ services:
     mem_limit: 768m
 
   parser:
+    restart: unless-stopped   # come back by themselves after a reboot / Docker restart
     build:
       context: ./backend
       dockerfile: parser-service/Dockerfile
@@ -185,6 +191,7 @@ services:
     mem_limit: 768m
 
   extractor:
+    restart: unless-stopped   # come back by themselves after a reboot / Docker restart
     build:
       context: ./backend
       dockerfile: extractor-service/Dockerfile
@@ -221,6 +228,7 @@ services:
     mem_limit: 768m
 
   matcher:
+    restart: unless-stopped   # come back by themselves after a reboot / Docker restart
     build:
       context: ./backend
       dockerfile: matcher-service/Dockerfile
@@ -241,6 +249,7 @@ services:
 
   # ---------- Phase 6: Trust Service (fraud heuristics) ----------
   fraud:
+    restart: unless-stopped   # come back by themselves after a reboot / Docker restart
     build:
       context: ./backend
       dockerfile: fraud-service/Dockerfile
@@ -264,6 +273,18 @@ services:
       minio:
         condition: service_healthy
     mem_limit: 512m
+
+  # ---------- Dashboard: React build served by nginx (http://localhost:5174) ----------
+  frontend:
+    restart: unless-stopped   # come back by themselves after a reboot / Docker restart
+    build:
+      context: ./frontend
+    image: ats/frontend
+    ports:
+      - "5174:80"
+    depends_on:
+      - api   # nginx forwards /api to api:8080
+    mem_limit: 64m
 
   # ---------- Phase 7: docker compose --profile search up -d ----------
   opensearch:
