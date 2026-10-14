@@ -37,7 +37,7 @@ export default function Header() {
   const menuItem = 'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-dim transition hover:bg-white/5 hover:text-ink'
 
   return (
-    <header className="card sticky top-4 z-20 mb-6 flex items-center gap-4 px-4 py-2.5 !rounded-2xl" ref={popRef}>
+    <header className="card relative z-20 mb-6 flex items-center gap-4 px-4 py-2.5 !rounded-2xl" ref={popRef}>
       <form onSubmit={submit} className="flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-white/5 px-3 py-2 ring-1 ring-white/10 transition focus-within:ring-cyan/50">
         <Search size={15} className="shrink-0 text-dim" />
         <input
