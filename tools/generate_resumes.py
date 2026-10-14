@@ -7,15 +7,22 @@ no host Python required. Deterministic for a given --seed.
 Output: <out>/resume_NNN[_kind].pdf + <out>/manifest.tsv with columns
     filename <TAB> name <TAB> email <TAB> phone <TAB> kind
 kinds: text | image | corrupt | fraud_overlap | fraud_timeline | fraud_hidden
+       | dup_exact | dup_copycat | dup_reapply
 
 Mix rules (documented in PROGRESS.md):
   - N >= 10: include 1 corrupt file + the 3 planted-fraud resumes
+             + 3 planted DEDUP cases, all built from the first normal text resume:
+               dup_exact   — byte-identical copy of that PDF, submitted by a DIFFERENT person
+               dup_copycat — the same resume re-typed under a different name/contact
+               dup_reapply — the SAME person (name/email/phone) applying again with the same file
+             (appended after their source, so the source always exists first)
   - N >= 5:  ~18% of the normal resumes are image-only PDFs (OCR targets)
 """
 import argparse
 import io
 import os
 import random
+import shutil
 import textwrap
 
 import reportlab
@@ -278,14 +285,16 @@ def main():
     kinds = []
     if include_special:
         kinds += ["fraud_overlap", "fraud_timeline", "fraud_hidden", "corrupt"]
-    n_normal = n - len(kinds)
+    n_dups = 3 if include_special else 0  # dup_exact, dup_copycat, dup_reapply (appended last)
+    n_normal = n - len(kinds) - n_dups
     if n_normal < 0:
-        raise SystemExit("--count must be >= 4 when specials are included (N >= 10)")
+        raise SystemExit("--count must be >= 7 when specials are included (N >= 10)")
     n_image = max(1, round(n_normal * 0.18)) if n >= 5 and n_normal > 0 else 0
     kinds += ["image"] * n_image + ["text"] * (n_normal - n_image)
     rng.shuffle(kinds)
 
     manifest = []
+    source = None  # first normal text resume: (name, email, phone, lines, path) — the dedup cases copy it
     for i, kind in enumerate(kinds, 1):
         domain = DISPOSABLE_DOMAIN if kind == "fraud_timeline" else None
         name, email, phone = make_person(rng, i, domain=domain)
@@ -307,8 +316,34 @@ def main():
         else:
             lines = resume_lines(rng, name, email, phone, pick_skills(rng), make_career(rng))
             write_text_pdf(path, lines, rng.randrange(3))
+            if source is None:
+                source = (name, email, phone, lines, path)
 
         manifest.append("\t".join([filename, name, email, phone, kind]))
+
+    if n_dups:
+        s_name, s_email, s_phone, s_lines, s_path = source
+        i = len(kinds)
+
+        i += 1  # dup_exact: the very same bytes, but a different person applies with it
+        name, email, phone = make_person(rng, i)
+        filename = f"resume_{i:03d}_dup_exact.pdf"
+        shutil.copyfile(s_path, os.path.join(args.out, filename))
+        manifest.append("\t".join([filename, name, email, phone, "dup_exact"]))
+
+        i += 1  # dup_copycat: same text under their own name + contact line, re-rendered (a DIFFERENT file)
+        name, email, phone = make_person(rng, i)
+        filename = f"resume_{i:03d}_dup_copycat.pdf"
+        copied = [("h1", name), ("small", f"{email}  |  {phone}  |  {rng.choice(CITIES)}, India")] + s_lines[2:]
+        write_text_pdf(os.path.join(args.out, filename), copied, rng.randrange(3))
+        manifest.append("\t".join([filename, name, email, phone, "dup_copycat"]))
+
+        i += 1  # dup_reapply: the same person, the same file, a second application
+        filename = f"resume_{i:03d}_dup_reapply.pdf"
+        shutil.copyfile(s_path, os.path.join(args.out, filename))
+        manifest.append("\t".join([filename, s_name, s_email, s_phone, "dup_reapply"]))
+
+        kinds += ["dup_exact", "dup_copycat", "dup_reapply"]
 
     with open(os.path.join(args.out, "manifest.tsv"), "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(manifest) + "\n")
