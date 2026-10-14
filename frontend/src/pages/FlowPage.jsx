@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Workflow, Timer, TriangleAlert, ShieldAlert } from 'lucide-react'
 import { api } from '../api'
 import { explainFailure, rootCause } from '../lib/failures'
+import { flagMeta } from '../lib/fraud'
 
 /**
  * Live Flow — the pipeline as a living diagram, flowing LEFT → RIGHT like a
@@ -179,6 +180,18 @@ export default function FlowPage() {
     return () => { alive = false }
   }, [jobs, jobId, failedCount])
 
+  // flagged rail: who the Trust Service pulled aside and why (top flag only) —
+  // re-fetched only when the flagged COUNT changes, like the failures above
+  const [flaggedItems, setFlaggedItems] = useState([])
+  const flaggedCount = stats?.current?.FLAGGED_FOR_REVIEW || 0
+  useEffect(() => {
+    let alive = true
+    api.reviewQueue(jobId)
+      .then((q) => alive && setFlaggedItems(q))
+      .catch(() => alive && setFlaggedItems([]))
+    return () => { alive = false }
+  }, [jobId, flaggedCount])
+
   const current = stats?.current || {}
   const ever = stats?.cumulative || {}
   const n = (m, k) => m[k] || 0
@@ -264,9 +277,30 @@ export default function FlowPage() {
             </span>
           </div>
           <p className="mt-1 text-[11px] leading-snug text-dim/70">
-            Suspicious resumes (hidden text, impossible timelines, anachronisms) get pulled aside here —
-            the Trust Service arrives in <span className="text-amber-300/90">Phase 6</span>.
+            The Trust Service pulls suspicious resumes aside and a human decides — the machine never rejects.
           </p>
+          <ul className="mt-2 space-y-1.5">
+            {flaggedItems.slice(0, 5).map((item) => {
+              // headline = the STRONGEST signal, not whichever check happened to run first
+              const top = [...(item.flags || [])].sort((x, y) => y.weight - x.weight)[0]
+              const { label, icon: Icon } = flagMeta(top?.code)
+              return (
+                <li key={item.applicationId}>
+                  <Link to={`/candidates?app=${item.applicationId}`}
+                        className="flex items-center gap-2 rounded-lg px-1.5 py-1 text-xs hover:bg-white/5">
+                    <Icon size={12} className="shrink-0 text-amber-300" />
+                    <span className="truncate font-medium">{item.name}</span>
+                    <span className="ml-auto shrink-0 text-dim">{label}{item.flags?.length > 1 ? ` +${item.flags.length - 1}` : ''}</span>
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+          {flaggedItems.length > 0 && (
+            <Link to="/review" className="mt-2 inline-block text-[11px] text-amber-300 hover:underline">
+              Open the review queue →
+            </Link>
+          )}
         </div>
 
         <div className="card p-4">

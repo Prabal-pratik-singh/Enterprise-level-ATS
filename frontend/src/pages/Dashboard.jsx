@@ -234,9 +234,12 @@ export default function Dashboard() {
                 <span className="text-rose-400">✕</span>
                 <span><b>{stats.knockouts.length}</b> knocked out by hard filters (still visible, never hidden)</span>
               </li>
-              <li className="flex gap-2 text-dim">
-                <span>🛡</span>
-                <span>Fraud flags: <b>{stats.byStatus.FLAGGED_FOR_REVIEW || 0}</b> — Trust Service lands in Phase 6</span>
+              <li className="flex gap-2">
+                <span className="text-amber-300">🛡</span>
+                <span>
+                  <b>{stats.byStatus.FLAGGED_FOR_REVIEW || 0}</b> flagged by the Trust Service —{' '}
+                  <Link to="/review" className="text-amber-300 hover:underline">review queue →</Link>
+                </span>
               </li>
             </ul>
           </div>
