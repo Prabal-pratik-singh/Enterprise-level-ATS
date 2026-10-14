@@ -277,14 +277,17 @@ export default function FlowPage() {
                   className={`card block w-32 p-2.5 text-center transition hover:ring-1 hover:ring-amber-400/40 ${pulses.FLAGGED_FOR_REVIEW ? 'ring-2 ring-amber-400/60' : ''}`}>
               <div className="text-xs font-medium text-amber-300">Flagged</div>
               <div className="text-2xl font-semibold tabular-nums">{n(current, 'FLAGGED_FOR_REVIEW')}</div>
+              <div className="text-[10px] text-dim">∑ ever: {n(ever, 'FLAGGED_FOR_REVIEW')}</div>
             </Link>
             <div className={`card w-32 p-2.5 text-center transition ${pulses.SHORTLISTED ? 'ring-2 ring-emerald-400/60' : ''}`}>
               <div className="text-xs font-medium text-emerald-400">Shortlisted</div>
               <div className="text-2xl font-semibold tabular-nums">{n(current, 'SHORTLISTED')}</div>
+              <div className="text-[10px] text-dim">∑ ever: {n(ever, 'SHORTLISTED')}</div>
             </div>
             <div className={`card w-32 p-2.5 text-center transition ${pulses.REJECTED ? 'ring-2 ring-rose-400/60' : ''}`}>
               <div className="text-xs font-medium text-rose-400">Rejected</div>
               <div className="text-2xl font-semibold tabular-nums">{n(current, 'REJECTED')}</div>
+              <div className="text-[10px] text-dim">∑ ever: {n(ever, 'REJECTED')}</div>
             </div>
           </div>
         </div>

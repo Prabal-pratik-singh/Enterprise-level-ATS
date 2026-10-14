@@ -36,7 +36,8 @@ export default function Sidebar() {
   }, [])
 
   return (
-    <aside className="card card-strong fixed left-4 top-4 bottom-4 z-10 flex w-56 flex-col p-4 !rounded-2xl">
+    // overflow-y-auto: on a short window the sidebar scrolls instead of the bottom card overlapping the links
+    <aside className="card card-strong fixed left-4 top-4 bottom-4 z-10 flex w-56 flex-col overflow-y-auto p-4 !rounded-2xl">
       {/* logo */}
       <div className="flex items-center gap-2.5 px-2 pb-5 pt-1">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet to-cyan shadow-lg shadow-violet/30">
@@ -81,7 +82,7 @@ export default function Sidebar() {
 
       {/* the engine room — real infra consoles */}
       <div className="px-2 pb-1 text-[10px] uppercase tracking-widest text-dim/70">Engine room</div>
-      <nav className="flex flex-col gap-1">
+      <nav className="mb-4 flex flex-col gap-1">
         {INFRA.map(({ href, icon: Icon, label }) => (
           <a key={label} href={href} target="_blank" rel="noreferrer"
              className={`${itemBase} text-dim hover:text-ink hover:bg-white/5`}>
@@ -93,7 +94,7 @@ export default function Sidebar() {
       </nav>
 
       {/* recruiter card pinned to the bottom (single-recruiter demo: no auth by design) */}
-      <div className="mt-auto rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
+      <div className="mt-auto shrink-0 rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
         <div className="flex items-center gap-2.5">
           <Avatar name="Demo Recruiter" size={34} />
           <div className="leading-tight">
