@@ -18,6 +18,13 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ decision, reason }),
     }),
+  reviewQueue: (jobId) => request(`/api/review-queue${jobId ? `?jobId=${jobId}` : ''}`),
+  // verdict: 'CLEAR' (false alarm — penalty lifted) | 'CONFIRM' (fraud — rejected)
+  fraudReview: (applicationId, verdict, reason) =>
+    request(`/api/candidates/${applicationId}/fraud-review`, {
+      method: 'POST',
+      body: JSON.stringify({ verdict, reason }),
+    }),
   stats: (jobId) => request(`/api/stats/pipeline${jobId ? `?jobId=${jobId}` : ''}`),
   lag: () => request('/api/admin/lag'),
 }
