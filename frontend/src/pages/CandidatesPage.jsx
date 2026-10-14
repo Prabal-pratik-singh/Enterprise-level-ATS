@@ -44,8 +44,11 @@ export default function CandidatesPage() {
     return () => source.close() // leaving the page closes the stream
   }, [jobId])
 
-  const updateRowStatus = (applicationId, status) =>
-    setRows((current) => current.map((r) => (r.applicationId === applicationId ? { ...r, status } : r)))
+  // patch: extra fields a fraud review changes (CLEAR → penalty 0, final = match), then re-rank
+  const updateRowStatus = (applicationId, status, patch = {}) =>
+    setRows((current) => current
+      .map((r) => (r.applicationId === applicationId ? { ...r, status, ...patch } : r))
+      .sort((a, b) => (b.finalScore ?? -1) - (a.finalScore ?? -1)))
 
   // header search lands here as ?q= — filter client-side by name/email
   const visible = useMemo(() => {

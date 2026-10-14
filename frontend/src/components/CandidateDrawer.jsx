@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
-import { TriangleAlert } from 'lucide-react'
+import { ShieldAlert, TriangleAlert } from 'lucide-react'
 import { api } from '../api'
 import { explainFailure, rootCause } from '../lib/failures'
 import Avatar from './Avatar'
 import ScoreBars from './ScoreBars'
 import StatusChip from './StatusChip'
+import { ReviewActions, TrustFindings } from './TrustPanel'
+import { pts } from '../lib/fraud'
 
 /** Extra line under a timeline entry — the audit trail's details, made readable. */
 function timelineDetail(entry) {
@@ -12,6 +14,9 @@ function timelineDetail(entry) {
   if (d.error) return { text: rootCause(d.error), tone: 'error' }
   if (entry.event === 'PARSED' && d.parse_method)
     return { text: `${d.parse_method}${d.page_count ? ` · ${d.page_count} page(s)` : ''}`, tone: 'dim' }
+  if (entry.event === 'TRUST_CHECKED')
+    return { text: `fraud score ${d.fraud_score}${(d.flags || []).length ? ` · ${d.flags.join(', ')}` : ' · clean'}`,
+             tone: d.flagged ? 'warn' : 'dim' }
   if (d.reason) return { text: `"${d.reason}"`, tone: 'dim' } // the recruiter's decision note
   return null
 }
@@ -41,7 +46,15 @@ export default function CandidateDrawer({ applicationId, onClose, onDecision }) 
     }
   }
 
+  // the Trust Service verdict was reviewed: update the row (status + maybe score) and close
+  const reviewed = (id, status, patch) => {
+    onDecision(id, status, patch)
+    onClose()
+  }
+
   const summary = report?.summary
+  const flags = Array.isArray(report?.flags) ? report.flags : []
+  const flagged = summary?.status === 'FLAGGED_FOR_REVIEW'
   const profile = report?.profile
   // why did parsing fail? the audit trail already carries the error text
   const failureRaw = summary?.status === 'PARSE_FAILED'
@@ -71,6 +84,11 @@ export default function CandidateDrawer({ applicationId, onClose, onDecision }) 
                   {summary?.finalScore != null ? Math.round(summary.finalScore) : '—'}
                 </div>
                 <div className="text-xs text-dim">final score</div>
+                {report.fraud_penalty > 0 && (
+                  <div className="mt-0.5 text-[11px] tabular-nums text-amber-300">
+                    {pts(report.match_score)} − {pts(report.fraud_penalty)} fraud
+                  </div>
+                )}
               </div>
             </div>
 
@@ -92,6 +110,25 @@ export default function CandidateDrawer({ applicationId, onClose, onDecision }) 
               </section>
             )}
 
+            {flags.length > 0 && (
+              <section className={`rounded-xl p-4 ring-1 ${flagged ? 'bg-amber-400/10 ring-amber-400/30' : 'bg-white/5 ring-white/10'}`}>
+                <h3 className="mb-2 flex items-center gap-2 font-semibold text-amber-300">
+                  <ShieldAlert size={15} /> {flagged ? 'Flagged by the Trust Service' : 'Trust check'}
+                </h3>
+                <TrustFindings flags={flags} fraudScore={report.fraud_score} matchScore={report.match_score}
+                               fraudPenalty={report.fraud_penalty} finalScore={summary?.finalScore} />
+                {flagged && (
+                  <div className="mt-4 border-t border-amber-400/15 pt-3">
+                    <p className="mb-2 text-xs text-dim">
+                      The system only flags — you decide. Clearing gives the points back; confirming rejects.
+                    </p>
+                    <ReviewActions applicationId={applicationId} matchScore={report.match_score} onReviewed={reviewed} />
+                  </div>
+                )}
+              </section>
+            )}
+
+            {!flagged && (
             <div className="flex gap-2">
               <button onClick={() => decide('SHORTLISTED')} disabled={busy}
                       className="flex-1 rounded-xl bg-gradient-to-r from-violet to-cyan py-2 font-medium text-white shadow-lg shadow-violet/30 transition hover:shadow-violet/50 disabled:opacity-50">
@@ -102,6 +139,7 @@ export default function CandidateDrawer({ applicationId, onClose, onDecision }) 
                 Reject
               </button>
             </div>
+            )}
 
             {report.components && (
               <section>
@@ -188,7 +226,7 @@ export default function CandidateDrawer({ applicationId, onClose, onDecision }) 
                       <span className="min-w-0">
                         <span className="text-dim">{new Date(entry.at).toLocaleString()}</span>
                         {detail && (
-                          <span className={`block break-words ${detail.tone === 'error' ? 'text-rose-300/90' : 'text-dim/60'}`}>
+                          <span className={`block break-words ${detail.tone === 'error' ? 'text-rose-300/90' : detail.tone === 'warn' ? 'text-amber-300/80' : 'text-dim/60'}`}>
                             {detail.text}
                           </span>
                         )}

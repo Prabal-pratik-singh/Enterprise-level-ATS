@@ -1,6 +1,8 @@
 import Avatar from './Avatar'
 import ScoreBars from './ScoreBars'
 import StatusChip from './StatusChip'
+import { ShieldAlert } from 'lucide-react'
+import { FLAG_THRESHOLD, flagMeta, flagsOf, pts } from '../lib/fraud'
 
 /**
  * The ranked candidates table, shared by the per-job page and the
@@ -32,7 +34,16 @@ export default function CandidateTable({ rows, freshIds = new Set(), onSelect, s
                 <div className="flex items-center gap-3">
                   <Avatar name={row.name} size={32} />
                   <div className="leading-tight">
-                    <div className="font-medium">{row.name}</div>
+                    <div className="flex items-center gap-1.5 font-medium">
+                      {row.name}
+                      {flagsOf(row).length > 0 && (
+                        // an SVG ignores title=, so the hover hint lives on a wrapper
+                        <span title={flagsOf(row).map((f) => flagMeta(f.code).label).join(' · ')}>
+                          <ShieldAlert size={13}
+                                       className={(row.fraudScore ?? 0) >= FLAG_THRESHOLD ? 'text-amber-300' : 'text-dim/60'} />
+                        </span>
+                      )}
+                    </div>
                     <div className="text-xs text-dim">{row.email}</div>
                   </div>
                 </div>
@@ -46,6 +57,12 @@ export default function CandidateTable({ rows, freshIds = new Set(), onSelect, s
                 <span className={`text-lg font-semibold tabular-nums ${row.knockedOut ? 'text-rose-400' : 'text-marigold'}`}>
                   {row.finalScore != null ? Math.round(row.finalScore) : '—'}
                 </span>
+                {row.fraudPenalty > 0 && (
+                  <span className="block text-[10px] tabular-nums text-amber-300/90"
+                        title={`match ${pts(row.matchScore)} − fraud penalty ${pts(row.fraudPenalty)}`}>
+                    −{pts(row.fraudPenalty)} fraud
+                  </span>
+                )}
               </td>
               <td className="px-4 py-3"><ScoreBars components={row.components} compact /></td>
               <td className="px-4 py-3 text-ink/80">
