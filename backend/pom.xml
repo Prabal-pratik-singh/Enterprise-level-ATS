@@ -22,6 +22,7 @@
         <module>extractor-service</module>
         <module>matcher-service</module>
         <module>fraud-service</module>
+        <module>dedup-service</module>
     </modules>
 
     <properties>
