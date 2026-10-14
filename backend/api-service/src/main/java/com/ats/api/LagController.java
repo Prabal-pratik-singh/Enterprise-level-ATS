@@ -33,6 +33,9 @@ public class LagController {
         GROUP_TO_TOPIC.put("parser-service", Topics.RESUME_UPLOADED);
         GROUP_TO_TOPIC.put("extractor-service", Topics.RESUME_PARSED);
         GROUP_TO_TOPIC.put("matcher-service", Topics.RESUME_EXTRACTED);
+        // Phase 6: two more workers read resume.extracted in parallel with the matcher
+        GROUP_TO_TOPIC.put("dedup-service", Topics.RESUME_EXTRACTED);
+        GROUP_TO_TOPIC.put("fraud-service", Topics.RESUME_EXTRACTED);
     }
 
     private final AdminClient admin;

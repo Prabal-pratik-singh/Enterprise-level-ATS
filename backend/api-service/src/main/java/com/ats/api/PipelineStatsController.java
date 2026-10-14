@@ -41,11 +41,17 @@ public class PipelineStatsController {
 
         Map<String, Long> cumulative = new LinkedHashMap<>();
         jdbc.query(
-                "select e.event_type, count(distinct e.application_id) from application_events e"
-                        + " where e.event_type in ('APPLIED','PARSED','EXTRACTED','SCORED',"
-                        + "'FLAGGED_FOR_REVIEW','SHORTLISTED','REJECTED','PARSE_FAILED')"
+                // Phase 6 records two stages under its own event names: a confirmed-fraud rejection
+                // is FRAUD_CONFIRMED, a flag is TRUST_CHECKED with flagged=true — count them as stages
+                "select case when e.event_type = 'FRAUD_CONFIRMED' then 'REJECTED'"
+                        + " when e.event_type = 'TRUST_CHECKED' then 'FLAGGED_FOR_REVIEW'"
+                        + " else e.event_type end as stage, count(distinct e.application_id)"
+                        + " from application_events e"
+                        + " where (e.event_type in ('APPLIED','PARSED','EXTRACTED','SCORED',"
+                        + "'SHORTLISTED','REJECTED','PARSE_FAILED','FRAUD_CONFIRMED')"
+                        + " or (e.event_type = 'TRUST_CHECKED' and (e.details->>'flagged')::boolean))"
                         + (jobId == null ? "" : " and e.application_id in (select id from applications where job_id = ?)")
-                        + " group by e.event_type",
+                        + " group by 1",
                 rs -> { cumulative.put(rs.getString(1), rs.getLong(2)); },
                 args);
 
