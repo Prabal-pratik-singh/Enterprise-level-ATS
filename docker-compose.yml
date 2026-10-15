@@ -327,10 +327,34 @@ services:
       start_period: 40s
     mem_limit: 2g
 
-  # ---------- Phase 4: docker compose --profile llm up -d ----------
+  # Phase 7: the embedder turns every extracted resume into a 768-number meaning vector
+  embedder:
+    restart: unless-stopped   # come back by themselves after a reboot / Docker restart
+    profiles: ["search"]
+    build:
+      context: ./backend
+      dockerfile: embedder-service/Dockerfile
+    image: ats/embedder-service
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ats}
+      DB_USER: ${POSTGRES_USER:-ats}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-ats}
+      OLLAMA_BASE_URL: http://ollama:11434   # works with a host-installed Ollama too (spec)
+      JAVA_OPTS: -XX:MaxRAMPercentage=75
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully   # the model is pulled before the first embedding
+    mem_limit: 384m
+
+  # ---------- Phase 4 (LLM extraction) + Phase 7 (embeddings) ----------
   ollama:
     image: ollama/ollama:latest
-    profiles: ["llm"]
+    profiles: ["llm", "search"]
     ports:
       # Host port 11435 (11434 belongs to another local Ollama); in-network it's ollama:11434
       - "11435:11434"
@@ -343,6 +367,18 @@ services:
       retries: 8
       start_period: 20s
     mem_limit: 5g
+
+  # one-shot, like minio-init: pull the embedding model (274 MB) so a fresh machine needs no manual step
+  ollama-init:
+    image: ollama/ollama:latest
+    profiles: ["llm", "search"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434   # the ollama CLI talks to the server container
+    entrypoint: ["ollama", "pull", "nomic-embed-text"]
+    restart: "no"
 
 volumes:
   kafka-data:
