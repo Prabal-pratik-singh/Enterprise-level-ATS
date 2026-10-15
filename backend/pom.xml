@@ -23,6 +23,7 @@
         <module>matcher-service</module>
         <module>fraud-service</module>
         <module>dedup-service</module>
+        <module>embedder-service</module>
     </modules>
 
     <properties>

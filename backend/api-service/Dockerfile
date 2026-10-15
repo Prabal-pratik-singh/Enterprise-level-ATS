@@ -14,6 +14,7 @@ COPY extractor-service/pom.xml extractor-service/
 COPY matcher-service/pom.xml matcher-service/
 COPY fraud-service/pom.xml fraud-service/
 COPY dedup-service/pom.xml dedup-service/
+COPY embedder-service/pom.xml embedder-service/
 RUN mvn -q -B -pl api-service -am dependency:go-offline
 COPY ats-common/src ats-common/src
 COPY api-service/src api-service/src
