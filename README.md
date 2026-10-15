@@ -28,7 +28,7 @@ docker compose up -d --build
 | Kafka UI (lag visualizer) | http://localhost:8085 |
 | MinIO console | http://localhost:9001 (minioadmin / minioadmin) |
 | Postgres (pgvector) | localhost:5434 (ats / ats) |
-| Frontend (from Phase 5) | http://localhost:5174 |
+| Frontend (container, nginx) | http://localhost:5174 |
 | Ollama (from Phase 4, profile `llm`) | http://localhost:11435 |
 | OpenSearch (from Phase 7, profile `search`) | http://localhost:9200 |
 
@@ -154,3 +154,28 @@ presigned PUTs so resume bytes never transit the API.
 - A satisfying accident of honest data: the two planted fraud resumes rank
   #1 and #2 on the backend job (hidden keyword stuffing inflates skill match).
   Phase 6's Trust Service exists to take them down.
+
+### Phase 6 — Trust layer: fraud heuristics + deduplication
+- `fraud-service` (the design board's **Trust Service**) checks every extracted
+  resume for things that can't all be true: two full-time jobs running in
+  parallel, more years claimed than have passed since graduation, technology
+  used before it was released, text hidden from humans (tiny or white ink —
+  the parser records the font/colour fingerprint), and throwaway inboxes. Each
+  signal has a weight; they combine like independent evidence
+  (`1 − Π(1 − w)`), and a score ≥ 0.5 takes up to 50 points off the ranking and
+  sends the application to a **Review Queue**. It only ever flags — a human
+  clears (points come back) or confirms (rejected), and a clearance survives
+  later re-checks unless genuinely new evidence appears.
+- `dedup-service` finds the same person (email/phone), the same file under a
+  different name (SHA-256), and copied work history: **MinHash** squeezes each
+  work history into 128 numbers whose agreement estimates text overlap, and
+  **LSH banding** means a new resume is only compared with the few that share a
+  bucket — not all 500K. Look-alikes share a cluster id; findings flow into the
+  trust score.
+- Honest results: on the 34 resumes already in the system, exactly the 6
+  planted fakes were flagged and the former top 4 — all fakes — dropped out of
+  the lead. Building it also surfaced a real bug: PDFBox never tracked fill
+  colours, so white-ink text had been invisible to the detector since Phase 3.
+- Dashboard: shield badges and "−35 fraud" under scores, every flag explained
+  in plain English in the drawer, the Review Queue page, and a Live Flow river
+  that shows matcher, dedup and trust working in parallel.
