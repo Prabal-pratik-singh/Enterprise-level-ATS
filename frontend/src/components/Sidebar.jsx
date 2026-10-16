@@ -15,7 +15,7 @@ const NAV = [
   { to: '/candidates', icon: Users, label: 'Candidates' },
   { to: '/flow', icon: Workflow, label: 'Live Flow' },
   { to: '/review', icon: ShieldAlert, label: 'Review Queue', badge: 'review' },
-  { icon: Search, label: 'Talent Search', soon: 'Phase 7' },
+  { to: '/search', icon: Search, label: 'Talent Search' },
 ]
 
 const INFRA = [

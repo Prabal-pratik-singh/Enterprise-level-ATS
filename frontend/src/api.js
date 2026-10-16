@@ -25,6 +25,14 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ verdict, reason }),
     }),
+  // hybrid search (Phase 7): filters are applied to BOTH the keyword and the meaning search
+  search: (jobId, { q = '', skills = '', minExp = '', hideFlagged = false, size = 30 } = {}) => {
+    const p = new URLSearchParams({ q, size: String(size) })
+    if (skills) p.set('skills', skills)
+    if (minExp) p.set('minExp', minExp)
+    if (hideFlagged) p.set('hideFlagged', 'true')
+    return request(`/api/jobs/${jobId}/search?${p}`)
+  },
   stats: (jobId) => request(`/api/stats/pipeline${jobId ? `?jobId=${jobId}` : ''}`),
   lag: () => request('/api/admin/lag'),
 }

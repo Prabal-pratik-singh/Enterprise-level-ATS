@@ -7,6 +7,7 @@ import CandidatesPage from './pages/CandidatesPage'
 import AllCandidatesPage from './pages/AllCandidatesPage'
 import FlowPage from './pages/FlowPage'
 import ReviewQueuePage from './pages/ReviewQueuePage'
+import SearchPage from './pages/SearchPage'
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="/candidates" element={<AllCandidatesPage />} />
           <Route path="/flow" element={<FlowPage />} />
           <Route path="/review" element={<ReviewQueuePage />} />
+          <Route path="/search" element={<SearchPage />} />
           <Route path="/jobs/:jobId" element={<CandidatesPage />} />
         </Routes>
       </div>
