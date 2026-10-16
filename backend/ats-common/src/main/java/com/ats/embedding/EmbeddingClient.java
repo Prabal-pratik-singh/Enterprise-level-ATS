@@ -49,6 +49,9 @@ public class EmbeddingClient {
     private float[] embed(String input) {
         ObjectNode body = mapper.createObjectNode().put("model", props.model());
         body.putArray("input").add(input);
+        // Ollama unloads an idle model after 5 min; reloading took 4.1s (measured) and made the first
+        // search after a break silently keyword-only. Keep this small model (274 MB) loaded instead.
+        body.put("keep_alive", props.keepAlive());
         try {
             HttpResponse<String> response = http.send(HttpRequest.newBuilder()
                             .uri(URI.create(props.baseUrl() + "/api/embed"))

@@ -37,5 +37,6 @@ app:
   embedding:
     base-url: ${OLLAMA_BASE_URL:http://localhost:11435}
     model: ${EMBEDDING_MODEL:nomic-embed-text}
+    keep-alive: ${EMBEDDING_KEEP_ALIVE:24h}   # keep the model loaded — a cold reload took 4.1s
     connect-timeout-seconds: 5
     read-timeout-seconds: 10
