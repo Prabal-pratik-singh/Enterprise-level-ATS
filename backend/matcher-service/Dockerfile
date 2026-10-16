@@ -13,6 +13,7 @@ COPY matcher-service/pom.xml matcher-service/
 COPY fraud-service/pom.xml fraud-service/
 COPY dedup-service/pom.xml dedup-service/
 COPY embedder-service/pom.xml embedder-service/
+COPY indexer-service/pom.xml indexer-service/
 RUN mvn -q -B -pl matcher-service -am dependency:go-offline
 COPY ats-common/src ats-common/src
 COPY matcher-service/src matcher-service/src

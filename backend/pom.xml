@@ -24,6 +24,7 @@
         <module>fraud-service</module>
         <module>dedup-service</module>
         <module>embedder-service</module>
+        <module>indexer-service</module>
     </modules>
 
     <properties>

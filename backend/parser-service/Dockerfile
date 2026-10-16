@@ -16,6 +16,7 @@ COPY matcher-service/pom.xml matcher-service/
 COPY fraud-service/pom.xml fraud-service/
 COPY dedup-service/pom.xml dedup-service/
 COPY embedder-service/pom.xml embedder-service/
+COPY indexer-service/pom.xml indexer-service/
 RUN mvn -q -B -pl parser-service -am dependency:go-offline
 # Only the sources we actually build: the shared library + this service
 COPY ats-common/src ats-common/src
