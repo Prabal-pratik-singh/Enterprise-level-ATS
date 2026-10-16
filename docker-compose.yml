@@ -327,6 +327,42 @@ services:
       start_period: 40s
     mem_limit: 2g
 
+  # one-shot, like minio-init: install the candidates index template + create the index
+  opensearch-init:
+    image: curlimages/curl:8.11.1
+    profiles: ["search"]
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/init/opensearch-init.sh"]
+    volumes:
+      - ./infra/init:/init:ro
+    restart: "no"
+
+  # Phase 7: the indexer keeps the OpenSearch read model (CQRS) in step with Postgres
+  indexer:
+    restart: unless-stopped   # come back by themselves after a reboot / Docker restart
+    profiles: ["search"]
+    build:
+      context: ./backend
+      dockerfile: indexer-service/Dockerfile
+    image: ats/indexer-service
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ats}
+      DB_USER: ${POSTGRES_USER:-ats}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-ats}
+      OPENSEARCH_URL: http://opensearch:9200
+      JAVA_OPTS: -XX:MaxRAMPercentage=75
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      opensearch-init:
+        condition: service_completed_successfully   # the index exists before the first bulk write
+    mem_limit: 384m
+
   # Phase 7: the embedder turns every extracted resume into a 768-number meaning vector
   embedder:
     restart: unless-stopped   # come back by themselves after a reboot / Docker restart
