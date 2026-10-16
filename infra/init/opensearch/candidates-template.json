@@ -1,0 +1,33 @@
+{
+  "index_patterns": ["candidates*"],
+  "template": {
+    "settings": { "index": { "knn": true, "number_of_shards": 1, "number_of_replicas": 0 } },
+    "mappings": {
+      "dynamic": "strict",
+      "properties": {
+        "application_id": { "type": "keyword" },
+        "job_id":         { "type": "keyword" },
+        "candidate_id":   { "type": "keyword" },
+        "name":           { "type": "text" },
+        "email":          { "type": "keyword" },
+        "location":       { "type": "keyword" },
+        "status":         { "type": "keyword" },
+        "final_score":    { "type": "float" },
+        "match_score":    { "type": "float" },
+        "fraud_score":    { "type": "float" },
+        "skills":         { "type": "keyword" },
+        "skills_text":    { "type": "text" },
+        "total_experience_months": { "type": "integer" },
+        "seniority":      { "type": "keyword" },
+        "summary":        { "type": "text" },
+        "experience":     { "type": "text" },
+        "projects":       { "type": "text" },
+        "embedding": {
+          "type": "knn_vector", "dimension": 768,
+          "method": { "name": "hnsw", "space_type": "cosinesimil", "engine": "lucene" }
+        },
+        "indexed_at":     { "type": "date" }
+      }
+    }
+  }
+}
