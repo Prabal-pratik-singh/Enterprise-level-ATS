@@ -41,3 +41,14 @@ app:
     access-key: ${S3_ACCESS_KEY:minioadmin}
     secret-key: ${S3_SECRET_KEY:minioadmin}
     bucket: ${S3_BUCKET:resumes}
+  # Phase 7 hybrid search. Both are optional at runtime: without OpenSearch the search
+  # endpoint answers 503, without Ollama it answers keyword-only — the rest of the API is unaffected.
+  search:
+    base-url: ${OPENSEARCH_URL:http://localhost:9200}
+    connect-timeout-seconds: 5
+    read-timeout-seconds: 10
+  embedding:
+    base-url: ${OLLAMA_BASE_URL:http://localhost:11435}
+    model: ${EMBEDDING_MODEL:nomic-embed-text}
+    connect-timeout-seconds: 5
+    read-timeout-seconds: 10

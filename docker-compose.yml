@@ -139,6 +139,9 @@ services:
       S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       S3_BUCKET: resumes
+      # Phase 7 search (profile "search"); the API starts fine without them
+      OPENSEARCH_URL: http://opensearch:9200
+      OLLAMA_BASE_URL: http://ollama:11434
       JAVA_OPTS: -XX:MaxRAMPercentage=75
     ports:
       # Host port 8082 (8080 belongs to another local stack); in-network it's still api:8080
