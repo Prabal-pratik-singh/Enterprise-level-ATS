@@ -11,6 +11,8 @@ import com.ats.domain.ApplicationRepository;
 import com.ats.domain.ApplicationStatus;
 import com.ats.domain.CandidateProfileRepository;
 import com.ats.domain.ScoreRepository;
+import com.ats.events.OutboxPublisher;
+import com.ats.events.Topics;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,16 +35,18 @@ public class RecruiterController {
     private final ApplicationEventRepository auditTrail;
     private final CandidateProfileRepository profiles;
     private final ScoreRepository scores;
+    private final OutboxPublisher outbox;
     private final ObjectMapper mapper;
 
     public RecruiterController(CandidateQueryService query, ApplicationRepository applications,
                                ApplicationEventRepository auditTrail, CandidateProfileRepository profiles,
-                               ScoreRepository scores, ObjectMapper mapper) {
+                               ScoreRepository scores, OutboxPublisher outbox, ObjectMapper mapper) {
         this.query = query;
         this.applications = applications;
         this.auditTrail = auditTrail;
         this.profiles = profiles;
         this.scores = scores;
+        this.outbox = outbox;
         this.mapper = mapper;
     }
 
@@ -111,6 +115,9 @@ public class RecruiterController {
                 "reason", req.reason() == null ? "" : req.reason(),
                 "decided_by", "demo-recruiter")))); // single-recruiter demo — no auth by design
 
+        // the indexer listens to this: the search copy shows the new status within ~2s
+        outbox.append(Topics.SHORTLIST_UPDATED, app.getId(), app.getJobId(), Map.of(
+                "status", decision.name(), "decided_by", "demo-recruiter"));
         return Map.of("applicationId", applicationId, "status", decision.name());
     }
 

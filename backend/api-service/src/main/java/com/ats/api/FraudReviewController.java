@@ -11,6 +11,8 @@ import com.ats.domain.ApplicationRepository;
 import com.ats.domain.ApplicationStatus;
 import com.ats.domain.Score;
 import com.ats.domain.ScoreRepository;
+import com.ats.events.OutboxPublisher;
+import com.ats.events.Topics;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,15 +37,17 @@ public class FraudReviewController {
     private final ApplicationRepository applications;
     private final ScoreRepository scores;
     private final ApplicationEventRepository auditTrail;
+    private final OutboxPublisher outbox;
     private final ObjectMapper mapper;
 
     public FraudReviewController(CandidateQueryService query, ApplicationRepository applications,
                                  ScoreRepository scores, ApplicationEventRepository auditTrail,
-                                 ObjectMapper mapper) {
+                                 OutboxPublisher outbox, ObjectMapper mapper) {
         this.query = query;
         this.applications = applications;
         this.scores = scores;
         this.auditTrail = auditTrail;
+        this.outbox = outbox;
         this.mapper = mapper;
     }
 
@@ -85,6 +89,9 @@ public class FraudReviewController {
                         "fraud_score", score.getFraudScore(),
                         "reason", req.reason() == null ? "" : req.reason(),
                         "decided_by", "demo-recruiter")))); // single-recruiter demo — no auth by design
+        // the indexer listens to this: the search copy shows the new status within ~2s
+        outbox.append(Topics.SHORTLIST_UPDATED, app.getId(), app.getJobId(), Map.of(
+                "status", next.name(), "decided_by", "demo-recruiter"));
         return Map.of("applicationId", applicationId, "status", next.name());
     }
 
