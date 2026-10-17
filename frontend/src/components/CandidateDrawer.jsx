@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ShieldAlert, TriangleAlert } from 'lucide-react'
 import { api } from '../api'
-import { explainFailure, rootCause } from '../lib/failures'
+import { explainExtractionFailure, explainFailure, rootCause } from '../lib/failures'
 import Avatar from './Avatar'
 import ScoreBars from './ScoreBars'
 import StatusChip from './StatusChip'
@@ -45,6 +45,11 @@ export default function CandidateDrawer({ applicationId, onClose, onDecision }) 
       setBusy(false)
     }
   }
+
+  // parsed but never extracted: the LLM step failed and the resume sits in the dead-letter queue
+  const extractRaw = report?.summary?.status === 'PARSED'
+    ? [...(report?.timeline || [])].reverse().find((e) => e.event === 'EXTRACT_FAILED')?.details?.error
+    : null
 
   // the Trust Service verdict was reviewed: update the row (status + maybe score) and close
   const reviewed = (id, status, patch) => {
@@ -125,6 +130,20 @@ export default function CandidateDrawer({ applicationId, onClose, onDecision }) 
                     <ReviewActions applicationId={applicationId} matchScore={report.match_score} onReviewed={reviewed} />
                   </div>
                 )}
+              </section>
+            )}
+
+            {extractRaw && (
+              <section className="rounded-xl bg-rose-400/10 p-4 ring-1 ring-rose-400/30">
+                <h3 className="flex items-center gap-2 font-semibold text-rose-300">
+                  <TriangleAlert size={15} /> Why extraction failed
+                </h3>
+                <p className="mt-1.5 text-sm leading-snug text-rose-200/90">{explainExtractionFailure(extractRaw)}</p>
+                <p className="mt-1.5 break-words font-mono text-[11px] leading-snug text-dim/60">{rootCause(extractRaw)}</p>
+                <p className="mt-2 text-xs leading-snug text-dim">
+                  The text was read fine; turning it into a profile failed. The resume is safe in the dead-letter
+                  queue — rewinding the extractor (runbook in PROGRESS.md) re-processes it, and finished resumes are skipped.
+                </p>
               </section>
             )}
 
