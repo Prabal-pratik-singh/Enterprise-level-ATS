@@ -7,13 +7,16 @@ import com.ats.domain.ApplicationEvent;
 import com.ats.domain.ApplicationEventRepository;
 import com.ats.domain.ApplicationRepository;
 import com.ats.domain.ApplicationStatus;
+import com.ats.domain.Candidate;
 import com.ats.domain.CandidateProfile;
 import com.ats.domain.CandidateProfileRepository;
+import com.ats.domain.CandidateRepository;
 import com.ats.events.EventEnvelope;
 import com.ats.events.OutboxPublisher;
 import com.ats.events.ProcessedEvents;
 import com.ats.events.Topics;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,16 +31,18 @@ public class ExtractRecorder {
 
     private final ProcessedEvents processed;
     private final CandidateProfileRepository profiles;
+    private final CandidateRepository candidates;
     private final ApplicationRepository applications;
     private final ApplicationEventRepository auditTrail;
     private final OutboxPublisher outbox;
     private final ObjectMapper mapper;
 
-    public ExtractRecorder(ProcessedEvents processed, CandidateProfileRepository profiles,
+    public ExtractRecorder(ProcessedEvents processed, CandidateProfileRepository profiles, CandidateRepository candidates,
                            ApplicationRepository applications, ApplicationEventRepository auditTrail,
                            OutboxPublisher outbox, ObjectMapper mapper) {
         this.processed = processed;
         this.profiles = profiles;
+        this.candidates = candidates;
         this.applications = applications;
         this.auditTrail = auditTrail;
         this.outbox = outbox;
@@ -64,6 +69,19 @@ public class ExtractRecorder {
                 .orElseGet(() -> new CandidateProfile(app.getId(), app.getCandidateId(),
                         profileJson, result.completeness()));
         profiles.save(profile);
+
+        // Bulk upload: the candidate is a placeholder — take the real identity from the resume NOW,
+        // in this transaction, so fraud/dedup/matcher (who start after resume.extracted) see it.
+        Candidate candidate = candidates.findById(app.getCandidateId())
+                .orElseThrow(() -> new IllegalStateException("candidate not found: " + app.getCandidateId()));
+        if (candidate.isIdentityPending()) {
+            JsonNode contact = result.profile().path("contact");
+            candidate.adoptIdentityFromResume(contact.path("name").asText(null),
+                    contact.path("email").asText(null), contact.path("phone").asText(null));
+            auditTrail.save(new ApplicationEvent(app.getId(), "IDENTITY_FROM_RESUME", json(Map.of(
+                    "name", candidate.getFullName(),
+                    "email_found", !candidate.getEmail().endsWith(Candidate.PENDING_EMAIL_DOMAIN)))));
+        }
 
         app.transitionTo(ApplicationStatus.EXTRACTED);
         auditTrail.save(new ApplicationEvent(app.getId(), "EXTRACTED", json(Map.of(
