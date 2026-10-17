@@ -179,3 +179,24 @@ presigned PUTs so resume bytes never transit the API.
 - Dashboard: shield badges and "−35 fraud" under scores, every flag explained
   in plain English in the drawer, the Review Queue page, and a Live Flow river
   that shows matcher, dedup and trust working in parallel.
+
+### Phase 7 — Hybrid search: keywords + meaning (CQRS read model)
+- Start it with `docker compose --profile search up -d` — OpenSearch, Ollama
+  (the embedding model is pulled automatically), the embedder and the indexer.
+- `embedder-service` turns every resume into 768 numbers that capture its
+  **meaning** (Ollama `nomic-embed-text`), stored in pgvector. Texts about the
+  same thing land close together even with different words.
+- `indexer-service` keeps a search-shaped copy of every candidate in
+  **OpenSearch** — the read side of CQRS. It re-reads Postgres for each change,
+  so the copy is always the current truth, and Kafka batches the work (up to
+  500 events or 2 seconds per bulk request).
+- `GET /api/jobs/{id}/search?q=&skills=&minExp=` runs keyword search (BM25) and
+  meaning search (kNN) side by side and merges them with **Reciprocal Rank
+  Fusion** — positions, not scores, so the two scales never have to agree.
+  Every result says where it came from: `keyword`, `semantic` or `both`.
+- The proof: "event driven backend" finds candidates whose resumes never say
+  "event driven" but describe Kafka work — labelled `semantic`.
+- Built to degrade, not break: without Ollama it answers keyword-only (and says
+  so); without OpenSearch it returns a clear 503 while the rest keeps working.
+- Dashboard: a **Talent Search** page with a filter sidebar, match-source badges
+  and per-list ranks.
