@@ -19,7 +19,8 @@ public record LlmProperties(
     public record Ollama(String baseUrl, String model) {
     }
 
-    public record Groq(String apiKey, String model) {
+    public record Groq(String apiKey, String model,
+                       String fallbackModel) {   // stronger model for inputs the main one keeps failing on
     }
 
     public record Gemini(String apiKey, String model) {

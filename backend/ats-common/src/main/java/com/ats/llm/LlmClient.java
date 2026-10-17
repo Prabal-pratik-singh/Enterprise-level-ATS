@@ -15,4 +15,13 @@ public interface LlmClient {
      * the result. LLM output is never trusted blindly.
      */
     String complete(String systemPrompt, String userPrompt, String jsonSchema);
+
+    /**
+     * The same request, sent to a STRONGER model if the provider has one configured.
+     * Used only as a last resort, after the normal model failed twice on the same input
+     * (at temperature 0 the same model will fail the same way forever).
+     */
+    default String completeWithStrongerModel(String systemPrompt, String userPrompt, String jsonSchema) {
+        return complete(systemPrompt, userPrompt, jsonSchema);   // no stronger model → same call
+    }
 }
