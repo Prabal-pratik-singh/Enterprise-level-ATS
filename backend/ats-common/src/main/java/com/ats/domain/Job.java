@@ -30,6 +30,15 @@ public class Job {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    /** A recruiter-created job. requirements = the JSON the matcher reads (must_have, nice_to_have, ...). */
+    public Job(String title, String description, String requirementsJson) {
+        this.id = UUID.randomUUID();
+        this.title = title;
+        this.description = description;
+        this.requirements = requirementsJson;
+        this.createdAt = Instant.now();
+    }
+
     protected Job() {
     }
 

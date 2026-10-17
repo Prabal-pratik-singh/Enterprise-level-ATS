@@ -61,6 +61,11 @@ public class SkillTaxonomy {
         return Optional.ofNullable(aliasToCanonical.get(normalize(rawSkill)));
     }
 
+    /** Every canonical skill name, A→Z — the job form's autocomplete list. */
+    public List<String> canonicalNames() {
+        return aliasToCanonical.values().stream().distinct().sorted().toList(); // every alias points at a canonical
+    }
+
     /** Year this tech first existed — the fraud service's anachronism reference. */
     public Optional<Integer> firstReleaseYear(String canonicalName) {
         return Optional.ofNullable(releaseYears.get(canonicalName));
