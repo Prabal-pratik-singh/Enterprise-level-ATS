@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom'
 import { api } from '../api'
 import {
   LayoutDashboard, Briefcase, Users, Workflow, ShieldAlert, Search, Activity,
-  Database, Rocket,
+  Database, Rocket, UploadCloud,
 } from 'lucide-react'
 import Avatar from './Avatar'
 
@@ -12,6 +12,7 @@ import Avatar from './Avatar'
 const NAV = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', end: true },
   { to: '/jobs', icon: Briefcase, label: 'Jobs' },
+  { to: '/upload', icon: UploadCloud, label: 'Upload resumes' },
   { to: '/candidates', icon: Users, label: 'Candidates' },
   { to: '/flow', icon: Workflow, label: 'Live Flow' },
   { to: '/review', icon: ShieldAlert, label: 'Review Queue', badge: 'review' },

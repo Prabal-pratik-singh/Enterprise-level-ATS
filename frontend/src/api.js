@@ -18,6 +18,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ decision, reason }),
     }),
+  // bulk upload: a placeholder candidate + application + presigned link, then the existing /complete
+  intake: (jobId, filename) => request(`/api/jobs/${jobId}/intake`, { method: 'POST', body: JSON.stringify({ filename }) }),
+  completeUpload: (applicationId, key) =>
+    request(`/api/applications/${applicationId}/resume/complete`, { method: 'POST', body: JSON.stringify({ key }) }),
   skills: () => request('/api/skills'),
   createJob: (job) => request('/api/jobs', { method: 'POST', body: JSON.stringify(job) }),
   reviewQueue: (jobId) => request(`/api/review-queue${jobId ? `?jobId=${jobId}` : ''}`),

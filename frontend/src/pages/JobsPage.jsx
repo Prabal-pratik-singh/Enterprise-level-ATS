@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, TriangleAlert } from 'lucide-react'
 import { api } from '../api'
 import NewJobModal from '../components/NewJobModal'
@@ -7,6 +7,7 @@ import NewJobModal from '../components/NewJobModal'
 export default function JobsPage() {
   const [jobs, setJobs] = useState(null)
   const [error, setError] = useState(null)
+  const navigate = useNavigate()
   const [params] = useSearchParams()
   const [creating, setCreating] = useState(params.get('new') === '1') // /jobs?new=1 opens the form
   const [notice, setNotice] = useState(null) // { title, unknownSkills } after a create
@@ -50,7 +51,15 @@ export default function JobsPage() {
               )}
             </div>
             <p className="mt-2 line-clamp-2 text-sm text-dim">{job.description}</p>
-            <p className="mt-3 text-sm font-medium text-cyan">{job.applicants} applicant(s) →</p>
+            <div className="mt-3 flex items-center justify-between">
+              <p className="text-sm font-medium text-cyan">{job.applicants} applicant(s) →</p>
+              {/* a Link inside a Link is invalid HTML, so this one navigates by hand */}
+              <span role="link" tabIndex={0}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/upload?job=${job.id}`) }}
+                    className="rounded-lg bg-white/5 px-2.5 py-1 text-xs text-dim ring-1 ring-white/10 hover:text-ink">
+                Upload resumes
+              </span>
+            </div>
           </Link>
         ))}
       </div>
