@@ -73,11 +73,7 @@ public class ResumeService {
     public UploadUrl createUploadUrl(UUID applicationId, String filename) {
         Application app = findApplication(applicationId);
         String ext = extensionOf(filename);
-        String contentType = CONTENT_TYPES.get(ext);
-        if (contentType == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "only pdf, docx, png and jpg files are accepted");
-        }
+        String contentType = requireSupportedType(filename);
         int version = resumes.maxVersion(applicationId) + 1;
         String key = "resumes/%s/%s/v%d/resume.%s".formatted(app.getJobId(), applicationId, version, ext);
 
@@ -141,6 +137,16 @@ public class ResumeService {
     private Application findApplication(UUID id) {
         return applications.findById(id).orElseThrow(
                 () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "application not found: " + id));
+    }
+
+    /** The content type for an accepted file name, or a 400 — callable BEFORE any rows are created. */
+    public static String requireSupportedType(String filename) {
+        String contentType = CONTENT_TYPES.get(extensionOf(filename));
+        if (contentType == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "only pdf, docx, png and jpg files are accepted");
+        }
+        return contentType;
     }
 
     private static String extensionOf(String filename) {
