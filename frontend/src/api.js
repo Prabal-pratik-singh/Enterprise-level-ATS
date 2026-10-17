@@ -18,6 +18,8 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ decision, reason }),
     }),
+  skills: () => request('/api/skills'),
+  createJob: (job) => request('/api/jobs', { method: 'POST', body: JSON.stringify(job) }),
   reviewQueue: (jobId) => request(`/api/review-queue${jobId ? `?jobId=${jobId}` : ''}`),
   // verdict: 'CLEAR' (false alarm — penalty lifted) | 'CONFIRM' (fraud — rejected)
   fraudReview: (applicationId, verdict, reason) =>
