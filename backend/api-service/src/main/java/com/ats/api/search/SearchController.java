@@ -85,7 +85,10 @@ public class SearchController {
             } catch (ResponseStatusException e) {
                 throw e;   // OpenSearch itself is down — keyword search would fail too
             } catch (Exception e) {
-                log.warn("semantic search unavailable, answering keyword-only: {}", e.getMessage());
+                // the wrapper says only "embedding call failed" — log the innermost cause too
+                // (timeout? refused connection? bad answer?) so the next occurrence explains itself
+                log.warn("semantic search unavailable, answering keyword-only: {} — root cause: {}",
+                        e.getMessage(), rootCause(e));
                 semanticState = "unavailable";   // Ollama down → keyword-only, and the answer says so
             }
         }
@@ -150,6 +153,15 @@ public class SearchController {
 
     private static Double number(JsonNode node) {
         return node.isNumber() ? node.asDouble() : null;
+    }
+
+    /** The innermost exception, e.g. "HttpTimeoutException: request timed out". */
+    private static String rootCause(Throwable e) {
+        Throwable t = e;
+        while (t.getCause() != null && t.getCause() != t) {
+            t = t.getCause();
+        }
+        return t.getClass().getSimpleName() + ": " + t.getMessage();
     }
 
     /** "Kafka, java,," → ["kafka", "java"] — skills are stored lower-case. */
