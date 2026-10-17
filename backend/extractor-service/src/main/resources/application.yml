@@ -39,6 +39,8 @@ app:
     groq:
       api-key: ${GROQ_API_KEY:}               # from .env via compose — never hardcoded
       model: ${GROQ_MODEL:openai/gpt-oss-20b}   # Groq retired the llama-3.1 line; verified live 2026-09
+      # used only for resumes the main model fails on (invalid JSON twice / json_validate_failed)
+      fallback-model: ${GROQ_FALLBACK_MODEL:openai/gpt-oss-120b}
     gemini:
       api-key: ${GEMINI_API_KEY:}
       model: ${GEMINI_MODEL:gemini-3.8-flash}   # Google retires model names too — verified live 2026-09

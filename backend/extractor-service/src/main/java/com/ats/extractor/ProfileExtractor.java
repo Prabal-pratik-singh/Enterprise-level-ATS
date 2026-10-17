@@ -79,7 +79,7 @@ public class ProfileExtractor {
         return new ExtractedProfile(profile, completeness, months, profile.path("skills").size());
     }
 
-    /** One honest question, one corrective retry, then give up loudly. */
+    /** One honest question, one corrective retry, one last try with the stronger model, then give up loudly. */
     private ObjectNode askWithOneRetry(String text) {
         String first = llm.complete(ProfilePrompts.SYSTEM, ProfilePrompts.userPrompt(text), validator.schemaJson());
         Attempt attempt = judge(first);
@@ -93,8 +93,18 @@ public class ProfileExtractor {
         if (retry.valid()) {
             return retry.profile();
         }
+        // Two invalid answers from the normal model: at temperature 0 a third ask would fail the
+        // same way — one last try with the stronger model (no-op for providers without one)
+        log.info("LLM answer failed validation twice ({}) — one last try with the stronger model", retry.errors());
+        String third = llm.completeWithStrongerModel(ProfilePrompts.SYSTEM,
+                ProfilePrompts.retryPrompt(text, second, retry.errors()), validator.schemaJson());
+        Attempt last = judge(third);
+        if (last.valid()) {
+            return last.profile();
+        }
         // -> Kafka retry policy -> resume.parsed.dlq; a human sees it in Kafka UI
-        throw new IllegalStateException("LLM produced an invalid profile twice: " + retry.errors());
+        throw new IllegalStateException("LLM produced an invalid profile three times (last: stronger model): "
+                + last.errors());
     }
 
     private record Attempt(ObjectNode profile, String errors) {
