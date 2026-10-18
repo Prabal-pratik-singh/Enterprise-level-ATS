@@ -124,7 +124,8 @@ class ScoringEngineTest {
     }
 
     @Test
-    void heavyOverqualificationDampensExperienceFit() throws Exception {
+    void moreExperienceThanRequiredIsNeverAMinus() throws Exception {
+        // "overqualified / flight risk" is an age-discrimination proxy — removed 2026-10-19
         var veteran = profile("""
                 {"skills":["java","spring-boot","kafka","sql"],
                  "experience":[{"title":"Principal","company":"W","start_date":"2016-01","current":true,
@@ -134,7 +135,8 @@ class ScoringEngineTest {
 
         ScoreCard card = engine.score(veteran, backendJob(), now); // 80/24 = 3.3x
 
-        assertThat(card.components().get("experience_fit")).isEqualTo(0.8);
-        assertThat(card.evidence()).anyMatch(e -> e.text().contains("overqualified"));
+        assertThat(card.components().get("experience_fit")).isEqualTo(1.0);   // full marks, not 0.8
+        assertThat(card.evidence()).noneMatch(e -> e.text().contains("overqualified") || e.text().contains("flight"));
+        assertThat(card.evidence()).anyMatch(e -> e.text().equals("80 months vs 24 required") && e.positive());
     }
 }

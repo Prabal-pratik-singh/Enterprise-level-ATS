@@ -141,7 +141,8 @@ public class ScoringEngine {
         return best < 0 ? 0.7 : best; // listed in skills but in no role text
     }
 
-    /** Below the bar hurts fast; at the bar = full; mild damp for 3x+ overqualified. */
+    /** Below the bar hurts fast; at or above the bar = full marks. More experience is never a minus —
+     *  "overqualified / flight risk" is an age-discrimination proxy (removed 2026-10-19). */
     private double experienceFit(int months, JobRequirements job, List<Evidence> evidence) {
         if (job.minExpMonths() <= 0 || job.fresherFriendly()) {
             evidence.add(new Evidence("experience", months + " months of experience (no bar for this job)", true));
@@ -150,11 +151,7 @@ public class ScoringEngine {
         double ratio = (double) months / job.minExpMonths();
         evidence.add(new Evidence("experience", months + " months vs " + job.minExpMonths() + " required",
                 ratio >= 1.0));
-        if (ratio >= 3.0) {
-            evidence.add(new Evidence("experience", "heavily overqualified — flight risk", false));
-            return 0.8;
-        }
-        return Math.min(1.0, ratio); // linear up to the bar, flat after
+        return Math.min(1.0, ratio); // linear up to the bar, full marks at and above it
     }
 
     /** Jaccard overlap between the job's words and each project's words. */
