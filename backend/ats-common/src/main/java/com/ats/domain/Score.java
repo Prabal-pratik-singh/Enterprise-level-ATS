@@ -55,6 +55,13 @@ public class Score {
     @Column(columnDefinition = "jsonb", nullable = false)
     private String flags;          // fraud flags — Phase 6 owns this
 
+    @Column(name = "rerank_adjustment", nullable = false)
+    private Double rerankAdjustment;   // Phase 8 LLM rerank: -0.10..+0.10 on the match score (V9)
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "llm_summary", columnDefinition = "jsonb")
+    private String llmSummary;         // the rerank's reasons: summary, coverage, depth, red flags
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -71,6 +78,7 @@ public class Score {
         this.evidence = "[]";
         this.fraudScore = 0.0;   // innocent until Phase 6 says otherwise
         this.fraudPenalty = 0.0;   // no penalty until the Trust Service says otherwise
+        this.rerankAdjustment = 0.0; // no nudge until an LLM rerank runs
         this.flags = "[]";
         this.createdAt = Instant.now();
         this.updatedAt = this.createdAt;
@@ -96,6 +104,21 @@ public class Score {
     public void clearFraudPenalty() {
         this.fraudPenalty = 0.0;
         this.updatedAt = Instant.now();
+    }
+
+    /** The LLM rerank's verdict: a nudge of at most ±10% plus its reasons (match/fraud halves untouched). */
+    public void updateRerank(double adjustment, String summaryJson) {
+        this.rerankAdjustment = Math.max(-0.10, Math.min(0.10, adjustment));   // clamp again, belt and braces
+        this.llmSummary = summaryJson;
+        this.updatedAt = Instant.now();
+    }
+
+    public Double getRerankAdjustment() {
+        return rerankAdjustment;
+    }
+
+    public String getLlmSummary() {
+        return llmSummary;
     }
 
     public UUID getId() {
