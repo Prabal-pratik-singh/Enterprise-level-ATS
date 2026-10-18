@@ -42,7 +42,7 @@ export default function AllCandidatesPage() {
       .then(async (jobList) => {
         setJobs(jobList)
         const pages = await Promise.all(
-          jobList.map((job) => api.candidates(job.id, 0, 200)
+          jobList.map((job) => api.allCandidates(job.id)
             .then((d) => d.items.map((row) => ({ ...row, jobId: job.id, jobTitle: job.title })))),
         )
         setRows(pages.flat().sort((a, b) => (b.finalScore ?? -1) - (a.finalScore ?? -1)))

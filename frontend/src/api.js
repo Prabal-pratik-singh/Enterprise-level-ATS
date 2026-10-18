@@ -12,6 +12,22 @@ export const api = {
   jobs: () => request('/api/jobs'),
   candidates: (jobId, page = 0, size = 100) =>
     request(`/api/jobs/${jobId}/candidates?sort=score&page=${page}&size=${size}`),
+  // EVERY candidate of a job: the API pages at max 200, so fetch page 0, learn the total,
+  // then the rest a few pages at a time (a 10K load test = 50 pages) — lists, search and
+  // dashboard numbers must cover everyone, not just the top 100/200
+  allCandidates: async (jobId) => {
+    const PAGE = 200
+    const first = await request(`/api/jobs/${jobId}/candidates?sort=score&page=0&size=${PAGE}`)
+    const pages = Math.ceil(first.total / PAGE)
+    const items = [...first.items]
+    for (let p = 1; p < pages; p += 4) {          // 4 requests in flight, in rank order
+      const batch = await Promise.all(
+        Array.from({ length: Math.min(4, pages - p) }, (_, k) =>
+          request(`/api/jobs/${jobId}/candidates?sort=score&page=${p + k}&size=${PAGE}`)))
+      batch.forEach((b) => items.push(...b.items))
+    }
+    return { total: first.total, items }
+  },
   report: (applicationId) => request(`/api/candidates/${applicationId}/report`),
   decide: (applicationId, decision, reason) =>
     request(`/api/candidates/${applicationId}/decision`, {

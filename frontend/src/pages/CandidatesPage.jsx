@@ -16,7 +16,7 @@ export default function CandidatesPage() {
   const [error, setError] = useState(null)
 
   const load = useCallback(() => {
-    api.candidates(jobId).then((data) => {
+    api.allCandidates(jobId).then((data) => {
       setRows(data.items)
       setTotal(data.total)
     }).catch((e) => setError(e.message))

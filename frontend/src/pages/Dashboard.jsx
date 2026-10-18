@@ -61,7 +61,7 @@ export default function Dashboard() {
       .then(async (jobList) => {
         setJobs(jobList)
         const pages = await Promise.all(
-          jobList.map((job) => api.candidates(job.id, 0, 200)
+          jobList.map((job) => api.allCandidates(job.id)
             .then((d) => d.items.map((row) => ({ ...row, jobId: job.id, jobTitle: job.title })))),
         )
         setRows(pages.flat())

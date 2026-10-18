@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import Avatar from './Avatar'
 import ScoreBars from './ScoreBars'
 import StatusChip from './StatusChip'
@@ -8,7 +9,15 @@ import { FLAG_THRESHOLD, flagMeta, flagsOf, pts } from '../lib/fraud'
  * The ranked candidates table, shared by the per-job page and the
  * all-candidates view (which adds the Job column via showJob).
  */
+const STEP = 100 // rows drawn at a time — 10K table rows at once would freeze the browser
+
 export default function CandidateTable({ rows, freshIds = new Set(), onSelect, showJob = false, emptyMessage }) {
+  // every row is loaded (search and filters see everyone); only the DRAWING is chunked
+  const [limit, setLimit] = useState(STEP)
+  useEffect(() => setLimit(STEP), [emptyMessage]) // a new filter/search starts from the top again
+  const shown = rows.slice(0, limit)
+  const hidden = rows.length - shown.length
+
   return (
     <div className="card overflow-hidden !rounded-2xl">
       <table className="w-full text-sm">
@@ -24,7 +33,7 @@ export default function CandidateTable({ rows, freshIds = new Set(), onSelect, s
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, index) => (
+          {shown.map((row, index) => (
             <tr key={row.applicationId}
                 onClick={() => onSelect(row.applicationId)}
                 className={`cursor-pointer border-t border-white/5 transition hover:bg-white/5
@@ -81,6 +90,18 @@ export default function CandidateTable({ rows, freshIds = new Set(), onSelect, s
           )}
         </tbody>
       </table>
+      {hidden > 0 && (
+        <div className="flex items-center justify-center gap-3 border-t border-white/5 px-4 py-3 text-sm">
+          <span className="text-dim">Showing {shown.length} of {rows.length}</span>
+          <button onClick={() => setLimit((n) => n + STEP)}
+                  className="rounded-lg bg-white/5 px-3 py-1 text-ink ring-1 ring-white/10 hover:bg-white/10">
+            Show {Math.min(STEP, hidden)} more
+          </button>
+          <button onClick={() => setLimit(rows.length)} className="text-xs text-cyan hover:underline">
+            show all {rows.length}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
