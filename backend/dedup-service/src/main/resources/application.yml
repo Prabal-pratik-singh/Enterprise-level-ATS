@@ -19,7 +19,8 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       enable-auto-commit: false
-      # no max-poll-records tweak: a few SQL queries per event
+      # 50 per poll: a few SQL queries per event — keeps a batch well inside the 5-min poll deadline at 10K
+      max-poll-records: 50
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer

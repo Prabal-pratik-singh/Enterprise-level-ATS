@@ -69,6 +69,9 @@ services:
   postgres:
     restart: unless-stopped   # come back by themselves after a reboot / Docker restart
     image: pgvector/pgvector:pg16
+    # 200, not the default 100: at --scale parser=8 the workers wanted ~190 connections and new
+    # parsers crash-looped on "too many clients" (2026-10-19). Production answer: PgBouncer.
+    command: ["postgres", "-c", "max_connections=200"]
     ports:
       # Host port 5434 (5432/5433 belong to other local stacks); in-network it's postgres:5432
       - "5434:5432"
@@ -188,6 +191,9 @@ services:
       S3_BUCKET: resumes
       # 70% of the 768m limit goes to the JVM heap; the rest is for
       # tesseract's native memory + page-render buffers
+      # a worker handles one message at a time: 4 connections, not Hikari's default 10 —
+      # 20 workers × 4 + api 10 stays far under max_connections even at --scale parser=8
+      SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE: "4"
       JAVA_OPTS: -XX:MaxRAMPercentage=70
     depends_on:
       kafka:
@@ -227,6 +233,9 @@ services:
       GROQ_FALLBACK_MODEL: ${GROQ_FALLBACK_MODEL:-openai/gpt-oss-120b}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
+      # a worker handles one message at a time: 4 connections, not Hikari's default 10 —
+      # 20 workers × 4 + api 10 stays far under max_connections even at --scale parser=8
+      SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE: "4"
       JAVA_OPTS: -XX:MaxRAMPercentage=75
     depends_on:
       kafka:
@@ -251,6 +260,9 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ats}
       DB_USER: ${POSTGRES_USER:-ats}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-ats}
+      # a worker handles one message at a time: 4 connections, not Hikari's default 10 —
+      # 20 workers × 4 + api 10 stays far under max_connections even at --scale parser=8
+      SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE: "4"
       JAVA_OPTS: -XX:MaxRAMPercentage=75
     depends_on:
       kafka:
@@ -277,6 +289,9 @@ services:
       S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       S3_BUCKET: resumes
+      # a worker handles one message at a time: 4 connections, not Hikari's default 10 —
+      # 20 workers × 4 + api 10 stays far under max_connections even at --scale parser=8
+      SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE: "4"
       JAVA_OPTS: -XX:MaxRAMPercentage=75
     depends_on:
       kafka:
@@ -299,6 +314,9 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ats}
       DB_USER: ${POSTGRES_USER:-ats}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-ats}
+      # a worker handles one message at a time: 4 connections, not Hikari's default 10 —
+      # 20 workers × 4 + api 10 stays far under max_connections even at --scale parser=8
+      SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE: "4"
       JAVA_OPTS: -XX:MaxRAMPercentage=75
     depends_on:
       kafka:
@@ -366,6 +384,9 @@ services:
       DB_USER: ${POSTGRES_USER:-ats}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-ats}
       OPENSEARCH_URL: http://opensearch:9200
+      # a worker handles one message at a time: 4 connections, not Hikari's default 10 —
+      # 20 workers × 4 + api 10 stays far under max_connections even at --scale parser=8
+      SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE: "4"
       JAVA_OPTS: -XX:MaxRAMPercentage=75
     depends_on:
       kafka:
@@ -390,6 +411,9 @@ services:
       DB_USER: ${POSTGRES_USER:-ats}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-ats}
       OLLAMA_BASE_URL: http://ollama:11434   # works with a host-installed Ollama too (spec)
+      # a worker handles one message at a time: 4 connections, not Hikari's default 10 —
+      # 20 workers × 4 + api 10 stays far under max_connections even at --scale parser=8
+      SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE: "4"
       JAVA_OPTS: -XX:MaxRAMPercentage=75
     depends_on:
       kafka:

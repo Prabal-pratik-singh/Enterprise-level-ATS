@@ -19,6 +19,10 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       enable-auto-commit: false       # offsets commit only AFTER the listener finishes successfully
+      # 20 per poll: even 20 scanned (OCR) resumes take ~2 min, far inside Kafka's 5-minute
+      # max.poll.interval. The default 500 blew past it at 10K: the member was kicked out mid-batch,
+      # its progress never committed, and the backlog never shrank (measured 2026-10-19).
+      max-poll-records: 20
     producer:                         # workers also produce: outbox relay + DLQ publishing
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
