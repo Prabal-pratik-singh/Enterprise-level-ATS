@@ -23,7 +23,8 @@ public class ApplicationController {
         this.applications = applications;
     }
 
-    public record CreateApplicationRequest(UUID candidateId) {
+    // loadTest: only seed.sh --bulk sets it — such resumes are read by rules, not the LLM
+    public record CreateApplicationRequest(UUID candidateId, Boolean loadTest) {
     }
 
     public record ApplicationResponse(UUID id, UUID jobId, UUID candidateId, String status, Instant createdAt) {
@@ -35,7 +36,7 @@ public class ApplicationController {
         if (req.candidateId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "candidateId is required");
         }
-        Application app = applications.create(jobId, req.candidateId());
+        Application app = applications.create(jobId, req.candidateId(), Boolean.TRUE.equals(req.loadTest()));
         return new ApplicationResponse(app.getId(), app.getJobId(), app.getCandidateId(),
                 app.getStatus().name(), app.getCreatedAt());
     }

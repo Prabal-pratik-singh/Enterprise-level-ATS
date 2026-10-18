@@ -33,14 +33,23 @@ public class Application {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    // V8: created by the load test (seed.sh --bulk) → the extractor uses rules, never the LLM
+    @Column(name = "load_test", nullable = false)
+    private boolean loadTest;
+
     protected Application() {
     }
 
     public Application(UUID jobId, UUID candidateId) {
+        this(jobId, candidateId, false);   // every real application
+    }
+
+    public Application(UUID jobId, UUID candidateId, boolean loadTest) {
         this.id = UUID.randomUUID();
         this.jobId = jobId;
         this.candidateId = candidateId;
         this.status = ApplicationStatus.APPLIED;
+        this.loadTest = loadTest;
         this.createdAt = Instant.now();
         this.updatedAt = this.createdAt;
     }
@@ -52,6 +61,10 @@ public class Application {
 
     public UUID getId() {
         return id;
+    }
+
+    public boolean isLoadTest() {
+        return loadTest;
     }
 
     public UUID getJobId() {

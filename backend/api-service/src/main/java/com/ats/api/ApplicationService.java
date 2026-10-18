@@ -37,18 +37,23 @@ public class ApplicationService {
 
     @Transactional
     public Application create(UUID jobId, UUID candidateId) {
+        return create(jobId, candidateId, false);   // real applications — always read by the LLM
+    }
+
+    @Transactional
+    public Application create(UUID jobId, UUID candidateId, boolean loadTest) {
         jobs.findById(jobId).orElseThrow(
                 () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "job not found: " + jobId));
         candidates.findById(candidateId).orElseThrow(
                 () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "candidate not found: " + candidateId));
 
-        Application app = new Application(jobId, candidateId);
+        Application app = new Application(jobId, candidateId, loadTest);
         try {
             applications.saveAndFlush(app);
         } catch (DataIntegrityViolationException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "candidate has already applied to this job");
         }
-        events.save(new ApplicationEvent(app.getId(), "APPLIED", "{}"));
+        events.save(new ApplicationEvent(app.getId(), "APPLIED", loadTest ? "{\"load_test\":true}" : "{}"));
         outbox.append(Topics.APPLICATION_CREATED, app.getId(), jobId,
                 Map.of("candidate_id", candidateId.toString()));
         return app;
