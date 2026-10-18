@@ -70,6 +70,73 @@ class RerankTest {
         assertThat(Reranker.partition(java.util.Collections.nCopies(43, "x"), Reranker.BATCH)).hasSize(9);
     }
 
+    // ---- fairness: verdicts resting on bias proxies are thrown away whole ----
+
+    @Test
+    void aVerdictUsingABiasProxyIsDiscardedAGenuineOneIsKept() {
+        String answer = """
+                {"results": [
+                  {"id": 1, "adjustment_percent": -5, "summary": "Strong Kafka.\\nSolid Java.\\nGood fit.",
+                   "red_flags": ["potential flight risk"]},
+                  {"id": 2, "adjustment_percent": -4, "summary": "Strong Kafka.\\nNo Java on the card.\\nRisky.",
+                   "red_flags": ["no Java experience on the card"]}]}""";
+        var verdicts = RerankPrompts.parse(mapper, answer, batch, "m");
+        assertThat(verdicts).extracting(RerankPrompts.Verdict::name).containsExactly("Candidate B");
+    }
+
+    @Test
+    void biasTermsAreCaughtWithoutFalseAlarmsOnTechWords() {
+        assertThat(RerankPrompts.BIAS_PROXY.matcher("may be overqualified").find()).isTrue();
+        assertThat(RerankPrompts.BIAS_PROXY.matcher("an older candidate").find()).isTrue();
+        assertThat(RerankPrompts.BIAS_PROXY.matcher("probably 45 years old").find()).isTrue();
+        assertThat(RerankPrompts.BIAS_PROXY.matcher("Flight-risk given tenure").find()).isTrue();
+        // tech and job words that merely CONTAIN the letters must not trip it
+        assertThat(RerankPrompts.BIAS_PROXY.matcher("golang, kafka, storage, message, race-free code").find()).isFalse();
+        // skill RECENCY is a fair signal — the matcher itself writes "java (older experience)"
+        assertThat(RerankPrompts.BIAS_PROXY.matcher("only older Java experience; spring-boot (older experience)")
+                .find()).isFalse();
+    }
+
+    // ---- the retry round for candidates the model left out ----
+
+    /** Answers only the FIRST card of every batch — like the model that skipped 5 of 50. */
+    static class ForgetfulLlm implements com.ats.llm.LlmClient {
+        int calls;
+
+        @Override
+        public String complete(String s, String u, String schema) {
+            throw new AssertionError("rerank must go straight to the stronger model");
+        }
+
+        @Override
+        public String completeWithStrongerModel(String s, String u, String schema) {
+            calls++;
+            return "{\"results\": [{\"id\": 1, \"adjustment_percent\": 2, \"summary\": \"a\\nb\\nc\"}]}";
+        }
+    }
+
+    @Test
+    void skippedCandidatesGetExactlyOneMoreRound() {
+        ForgetfulLlm llm = new ForgetfulLlm();
+        java.util.List<UUID> recorded = new java.util.ArrayList<>();
+        RerankRecorder recorder = new RerankRecorder(null, null, null, null, mapper) {
+            @Override
+            public void record(UUID jobId, RerankPrompts.Verdict v) {
+                recorded.add(v.applicationId());
+            }
+        };
+        Reranker reranker = new Reranker(null, null, null, recorder, mapper);
+        List<RerankCard> six = java.util.stream.IntStream.range(0, 6).mapToObj(i -> card("C" + i)).toList();
+        JobBrief job = new JobBrief("Backend", List.of("java"), List.of(), 24);
+
+        var left = reranker.judgeAll(llm, job, UUID.randomUUID(), six, "m");          // 2 batches → 2 judged
+        assertThat(left).hasSize(4);
+        var stillLeft = reranker.judgeAll(llm, job, UUID.randomUUID(), left, "m");    // the retry round
+        assertThat(stillLeft).hasSize(3);
+        assertThat(recorded).hasSize(3);
+        assertThat(llm.calls).isEqualTo(3);
+    }
+
     @Test
     void noLlmMeansA503NotACrash() {
         Reranker noLlm = new Reranker(new org.springframework.beans.factory.support.StaticListableBeanFactory()

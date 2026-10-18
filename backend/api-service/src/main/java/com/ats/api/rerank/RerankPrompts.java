@@ -3,6 +3,7 @@ package com.ats.api.rerank;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,7 +20,10 @@ final class RerankPrompts {
     static final double MAX_ADJUSTMENT = 0.10;   // ±10% — the spec's bound
 
     static final String SYSTEM = """
-            You are a senior technical recruiter. For EACH candidate card, judge against the job:
+            You are a senior technical recruiter. For EACH candidate card, judge against the job.
+            Judge ONLY job-relevant evidence on the card. NEVER consider or mention age or years since
+            graduation, "overqualified", "flight risk", gender, nationality, location, names, or gaps
+            without evidence. A red flag must point at something written on the card.
             1. adjustment_percent: an integer from -10 to +10 — how much the formula score UNDER- or OVER-rates them
             2. summary: exactly 3 lines of at most 15 words each, readable in 10 seconds
             3. depth_vs_breadth: "depth" (deep, production experience) or "breadth" (many skills, little depth)
@@ -41,6 +45,18 @@ final class RerankPrompts {
                 "red_flags":{"type":"array","items":{"type":"string"}},
                 "must_have_coverage":{"type":"array","items":{"type":"object","properties":{
                   "skill":{"type":"string"},"evidence":{"type":"string"}}}}}}}}}""";
+
+    // Bias proxies a hiring decision must never rest on. Matched in red flags AND the summary;
+    // a hit throws away the WHOLE verdict — scrubbing the words would hide bias already baked into
+    // the adjustment number. (Seen live 2026-10-19: "potential flight risk", "may be overqualified"
+    // for candidates with 8+ years — classic age-discrimination proxies.)
+    static final Pattern BIAS_PROXY = Pattern.compile(
+            // NOT plain "older": the matcher's own evidence says "java (older experience)" — that is about
+            // skill recency, a fair job signal. Only phrases about the PERSON count.
+            "flight.?risk|over.?qualif|\\bage\\b|\\baged\\b|years old|too (old|young)|elderly|"
+                    + "(older|younger) (candidate|person|applicant|engineer|developer|worker)|gender|nationality|"
+                    // not "race": "race condition" / "race-free" are everyday engineering words
+                    + "religio|married|pregnan|ethnic|\\bcaste\\b", Pattern.CASE_INSENSITIVE);
 
     /** One candidate's judged result, already clamped and tied back to a real application. */
     record Verdict(UUID applicationId, String name, double adjustment, ObjectNode reasons) {
@@ -98,6 +114,11 @@ final class RerankPrompts {
             reasons.set("red_flags", r.path("red_flags").isArray() ? r.path("red_flags") : mapper.createArrayNode());
             reasons.put("adjustment_percent", Math.round(adjustment * 100));
             reasons.put("model", model);
+            if (BIAS_PROXY.matcher(summary + " " + reasons.path("red_flags")).find()) {
+                log.warn("rerank verdict for id={} discarded — it relied on a bias proxy: {} {}", id,
+                        reasons.path("red_flags"), summary.replace('\n', ' '));
+                continue;   // keeps the formula score: judged on evidence, or not at all
+            }
             RerankCard card = batch.get(id - 1);
             verdicts.add(new Verdict(card.applicationId(), card.name(), adjustment, reasons));
         }

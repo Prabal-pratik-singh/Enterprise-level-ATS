@@ -1,7 +1,9 @@
 package com.ats.api.rerank;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import com.ats.llm.LlmClient;
@@ -49,27 +51,44 @@ public class Reranker {
         JobBrief job = briefs.forJob(jobId);
         String model = modelName();
         long t0 = System.currentTimeMillis();
-        int judged = 0;
+        List<RerankCard> unjudged = judgeAll(client, job, jobId, cards, model);
+        if (!unjudged.isEmpty()) {
+            // the model sometimes leaves candidates out (or a verdict was discarded): one more round, just them
+            log.info("rerank: {} candidate(s) without a verdict — asking once more", unjudged.size());
+            unjudged = judgeAll(client, job, jobId, unjudged, model);
+        }
+        log.info("rerank of job {} done: {}/{} candidates judged by {} in {}s", jobId,
+                cards.size() - unjudged.size(), cards.size(), model, (System.currentTimeMillis() - t0) / 1000);
+    }
+
+    /** One pass in batches; returns the cards that got NO recorded verdict. */
+    List<RerankCard> judgeAll(LlmClient client, JobBrief job, UUID jobId, List<RerankCard> cards, String model) {
+        List<RerankCard> leftover = new ArrayList<>();
         for (List<RerankCard> batch : partition(cards, BATCH)) {
+            Set<UUID> judged = new HashSet<>();
             try {
-                String answer = client.complete(RerankPrompts.SYSTEM, RerankPrompts.user(mapper, job, batch),
-                        RerankPrompts.SCHEMA);
+                // straight to the stronger model: measured 2026-10-19, the small one returned invalid
+                // JSON on 9 of 10 rerank calls — each failure cost a call AND per-minute token budget
+                String answer = client.completeWithStrongerModel(RerankPrompts.SYSTEM,
+                        RerankPrompts.user(mapper, job, batch), RerankPrompts.SCHEMA);
                 for (RerankPrompts.Verdict v : RerankPrompts.parse(mapper, answer, batch, model)) {
                     recorder.record(jobId, v);   // one transaction per candidate: visible on the page at once
-                    judged++;
+                    judged.add(v.applicationId());
                 }
             } catch (Exception e) {
                 // one bad batch must not lose the others — its candidates keep their formula score
                 log.warn("rerank batch of {} failed for job {}: {}", batch.size(), jobId, e.getMessage());
             }
+            batch.stream().filter(c -> !judged.contains(c.applicationId())).forEach(leftover::add);
         }
-        log.info("rerank of job {} done: {}/{} candidates judged by {} in {}s", jobId, judged, cards.size(),
-                model, (System.currentTimeMillis() - t0) / 1000);
+        return leftover;
     }
 
+    /** The model that actually judges: the provider's stronger one when configured. */
     private String modelName() {
         return switch (props.provider() == null ? "" : props.provider().toLowerCase()) {
-            case "groq" -> props.groq().model();
+            case "groq" -> props.groq().fallbackModel() != null && !props.groq().fallbackModel().isBlank()
+                    ? props.groq().fallbackModel() : props.groq().model();
             case "gemini" -> props.gemini().model();
             case "ollama" -> props.ollama().model();
             default -> props.provider();
