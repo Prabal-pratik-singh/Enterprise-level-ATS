@@ -141,6 +141,14 @@ services:
       S3_BUCKET: resumes
       # Phase 7 search (profile "search"); the API starts fine without them
       OPENSEARCH_URL: http://opensearch:9200
+      # Phase 8 rerank: the same LLM switch as the extractor (values from the gitignored .env)
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
+      GROQ_FALLBACK_MODEL: ${GROQ_FALLBACK_MODEL:-openai/gpt-oss-120b}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
+      LLM_READ_TIMEOUT_SECONDS: "180"
       OLLAMA_BASE_URL: http://ollama:11434
       JAVA_OPTS: -XX:MaxRAMPercentage=75
     ports:

@@ -80,6 +80,8 @@ public class RecruiterController {
             report.put("match_score", s.getMatchScore());
             report.put("fraud_penalty", s.getFraudPenalty());   // match_score - fraud_penalty = final score
             report.put("fraud_score", s.getFraudScore());
+            report.put("rerank_adjustment", s.getRerankAdjustment());
+            report.put("llm_summary", readTree(s.getLlmSummary()));   // the AI review, if a rerank ran
             report.put("flags", readTree(s.getFlags()));
         });
         report.put("timeline", auditTrail.findByApplicationIdOrderByCreatedAtAsc(applicationId).stream()

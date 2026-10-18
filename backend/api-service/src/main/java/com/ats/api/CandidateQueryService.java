@@ -21,6 +21,7 @@ public class CandidateQueryService {
     /** One row of the ranked table (also the SSE push payload). */
     public record CandidateRow(UUID applicationId, String name, String email, String status,
                                Double finalScore, Double matchScore, Double fraudPenalty, // match - penalty = final
+                               Double rerankAdjustment,  // Phase 8 LLM nudge, -0.10..+0.10
                                JsonNode components, Double fraudScore,
                                JsonNode flags, Integer totalExperienceMonths, String seniority,
                                Double completeness, boolean knockedOut) {
@@ -28,7 +29,7 @@ public class CandidateQueryService {
 
     private static final String BASE_SELECT = """
             select a.id as application_id, c.full_name, c.email, a.status,
-                   s.final_score, s.match_score, s.fraud_penalty, s.components, s.fraud_score, s.flags, s.evidence,
+                   s.final_score, s.match_score, s.fraud_penalty, s.rerank_adjustment, s.components, s.fraud_score, s.flags, s.evidence,
                    p.completeness,
                    (p.profile->'derived'->>'total_experience_months')::int as total_months,
                    p.profile->'derived'->>'seniority' as seniority,
@@ -85,6 +86,7 @@ public class CandidateQueryService {
                 dbl(rs.getObject("final_score")),
                 dbl(rs.getObject("match_score")),
                 dbl(rs.getObject("fraud_penalty")),
+                dbl(rs.getObject("rerank_adjustment")),
                 parseJson(rs.getString("components")),
                 dbl(rs.getObject("fraud_score")),
                 parseJson(rs.getString("flags")),

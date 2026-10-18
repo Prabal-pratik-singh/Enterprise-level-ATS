@@ -30,7 +30,8 @@ public class ScoredEventsListener {
     }
 
     // A flag changes the row (status + penalty) just like a score does — same push, same "candidate" event
-    @KafkaListener(topics = {Topics.APPLICATION_SCORED, Topics.APPLICATION_FLAGGED}, groupId = "api-sse",
+    @KafkaListener(topics = {Topics.APPLICATION_SCORED, Topics.APPLICATION_FLAGGED, Topics.SHORTLIST_UPDATED},
+            groupId = "api-sse",
             properties = "auto.offset.reset=latest")
     public void onRowChanged(String message) {
         try {

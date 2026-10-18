@@ -35,6 +35,21 @@ management:
         include: health,info
 
 app:
+  # Phase 8 rerank — the same provider switch the extractor uses
+  llm:
+    provider: ${LLM_PROVIDER:ollama}
+    connect-timeout-seconds: 5
+    read-timeout-seconds: ${LLM_READ_TIMEOUT_SECONDS:60}
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11435}
+      model: ${OLLAMA_MODEL:qwen2.5:3b}
+    groq:
+      api-key: ${GROQ_API_KEY:}
+      model: ${GROQ_MODEL:openai/gpt-oss-20b}
+      fallback-model: ${GROQ_FALLBACK_MODEL:openai/gpt-oss-120b}
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+      model: ${GEMINI_MODEL:gemini-3.8-flash}
   s3:
     endpoint: ${S3_ENDPOINT:http://localhost:9000}
     public-endpoint: ${S3_PUBLIC_ENDPOINT:http://localhost:9000}
