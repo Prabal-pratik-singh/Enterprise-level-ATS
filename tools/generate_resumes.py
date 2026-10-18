@@ -19,6 +19,7 @@ Mix rules (documented in PROGRESS.md):
   - N >= 5:  ~18% of the normal resumes are image-only PDFs (OCR targets)
 """
 import argparse
+import multiprocessing
 import io
 import os
 import random
@@ -270,11 +271,48 @@ HIDDEN_STUFFING = ("kubernetes kafka aws java spring-boot terraform microservice
 
 # ------------------------------------------------------------------------ main
 
+def render_item(i, kind, rng, out, width):
+    """Write ONE resume file; returns (manifest row, text-source-or-None). Shared by the
+    sequential mode and the --fast (multiprocessing) mode."""
+    domain = DISPOSABLE_DOMAIN if kind == "fraud_timeline" else None
+    name, email, phone = make_person(rng, i, domain=domain)
+    filename = f"resume_{i:0{width}d}_{kind}.pdf"
+    path = os.path.join(out, filename)
+    lines = None
+    if kind == "corrupt":
+        write_corrupt_pdf(path, rng)
+    elif kind == "image":
+        write_image_pdf(path, resume_lines(rng, name, email, phone, pick_skills(rng), make_career(rng)))
+    elif kind == "fraud_overlap":
+        write_text_pdf(path, fraud_overlap(rng, name, email, phone), rng.randrange(3))
+    elif kind == "fraud_timeline":
+        write_text_pdf(path, fraud_timeline(rng, name, email, phone), rng.randrange(3))
+    elif kind == "fraud_hidden":
+        write_text_pdf(path, resume_lines(rng, name, email, phone, pick_skills(rng), make_career(rng)),
+                       rng.randrange(3), hidden_text=HIDDEN_STUFFING)
+    else:
+        lines = resume_lines(rng, name, email, phone, pick_skills(rng), make_career(rng))
+        write_text_pdf(path, lines, rng.randrange(3))
+    row = "\t".join([filename, name, email, phone, kind])
+    return row, ((name, email, phone, lines, path) if lines else None)
+
+
+def _render_fast(job):
+    """--fast worker: each resume gets its OWN random stream (seed, index), so the output is
+    reproducible no matter which CPU core renders which file."""
+    i, kind, seed, out, width = job
+    return render_item(i, kind, random.Random(seed * 1_000_003 + i), out, width)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--count", type=int, required=True)
     ap.add_argument("--seed", type=int, required=True)
     ap.add_argument("--out", default="out")
+    ap.add_argument("--fast", action="store_true",
+                    help="render on every CPU core (Phase 8 load test: 10,000 resumes)")
+    ap.add_argument("--image-share", type=float, default=0.18,
+                    help="share of image-only PDFs (OCR targets); the 10K demo uses 0.05")
     args = ap.parse_args()
 
     rng = random.Random(args.seed)
@@ -289,37 +327,24 @@ def main():
     n_normal = n - len(kinds) - n_dups
     if n_normal < 0:
         raise SystemExit("--count must be >= 7 when specials are included (N >= 10)")
-    n_image = max(1, round(n_normal * 0.18)) if n >= 5 and n_normal > 0 else 0
+    n_image = max(1, round(n_normal * args.image_share)) if n >= 5 and n_normal > 0 else 0
     kinds += ["image"] * n_image + ["text"] * (n_normal - n_image)
     rng.shuffle(kinds)
 
+    width = max(3, len(str(n)))  # resume_007 for small runs, resume_00007 for 10K
     manifest = []
     source = None  # first normal text resume: (name, email, phone, lines, path) — the dedup cases copy it
-    for i, kind in enumerate(kinds, 1):
-        domain = DISPOSABLE_DOMAIN if kind == "fraud_timeline" else None
-        name, email, phone = make_person(rng, i, domain=domain)
-        filename = f"resume_{i:03d}_{kind}.pdf"
-        path = os.path.join(args.out, filename)
-
-        if kind == "corrupt":
-            write_corrupt_pdf(path, rng)
-        elif kind == "image":
-            lines = resume_lines(rng, name, email, phone, pick_skills(rng), make_career(rng))
-            write_image_pdf(path, lines)
-        elif kind == "fraud_overlap":
-            write_text_pdf(path, fraud_overlap(rng, name, email, phone), rng.randrange(3))
-        elif kind == "fraud_timeline":
-            write_text_pdf(path, fraud_timeline(rng, name, email, phone), rng.randrange(3))
-        elif kind == "fraud_hidden":
-            lines = resume_lines(rng, name, email, phone, pick_skills(rng), make_career(rng))
-            write_text_pdf(path, lines, rng.randrange(3), hidden_text=HIDDEN_STUFFING)
-        else:
-            lines = resume_lines(rng, name, email, phone, pick_skills(rng), make_career(rng))
-            write_text_pdf(path, lines, rng.randrange(3))
-            if source is None:
-                source = (name, email, phone, lines, path)
-
-        manifest.append("\t".join([filename, name, email, phone, kind]))
+    if args.fast:
+        jobs = [(i, kind, args.seed, args.out, width) for i, kind in enumerate(kinds, 1)]
+        with multiprocessing.Pool() as pool:
+            results = pool.map(_render_fast, jobs, chunksize=50)
+    else:
+        # sequential: ONE shared random stream, exactly as before — old seeds reproduce byte-for-byte
+        results = [render_item(i, kind, rng, args.out, width) for i, kind in enumerate(kinds, 1)]
+    for row, text_source in results:
+        manifest.append(row)
+        if source is None and text_source is not None:
+            source = text_source
 
     if n_dups:
         s_name, s_email, s_phone, s_lines, s_path = source
@@ -327,19 +352,19 @@ def main():
 
         i += 1  # dup_exact: the very same bytes, but a different person applies with it
         name, email, phone = make_person(rng, i)
-        filename = f"resume_{i:03d}_dup_exact.pdf"
+        filename = f"resume_{i:0{width}d}_dup_exact.pdf"
         shutil.copyfile(s_path, os.path.join(args.out, filename))
         manifest.append("\t".join([filename, name, email, phone, "dup_exact"]))
 
         i += 1  # dup_copycat: same text under their own name + contact line, re-rendered (a DIFFERENT file)
         name, email, phone = make_person(rng, i)
-        filename = f"resume_{i:03d}_dup_copycat.pdf"
+        filename = f"resume_{i:0{width}d}_dup_copycat.pdf"
         copied = [("h1", name), ("small", f"{email}  |  {phone}  |  {rng.choice(CITIES)}, India")] + s_lines[2:]
         write_text_pdf(os.path.join(args.out, filename), copied, rng.randrange(3))
         manifest.append("\t".join([filename, name, email, phone, "dup_copycat"]))
 
         i += 1  # dup_reapply: the same person, the same file, a second application
-        filename = f"resume_{i:03d}_dup_reapply.pdf"
+        filename = f"resume_{i:0{width}d}_dup_reapply.pdf"
         shutil.copyfile(s_path, os.path.join(args.out, filename))
         manifest.append("\t".join([filename, s_name, s_email, s_phone, "dup_reapply"]))
 
