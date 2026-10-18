@@ -3,6 +3,7 @@ import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { api } from '../api'
 import CandidateTable from '../components/CandidateTable'
 import CandidateDrawer from '../components/CandidateDrawer'
+import RerankButton from '../components/RerankButton'
 
 export default function CandidatesPage() {
   const { jobId } = useParams()
@@ -65,7 +66,10 @@ export default function CandidatesPage() {
         <h1 className="text-2xl font-semibold tracking-tight">
           Ranked candidates <span className="text-base text-dim">({query ? `${visible.length} of ${total}` : total})</span>
         </h1>
-        <Link to="/" className="text-sm text-cyan hover:underline">← dashboard</Link>
+        <div className="flex items-center gap-3">
+          <RerankButton jobId={jobId} onDone={load} />
+          <Link to="/" className="text-sm text-cyan hover:underline">← dashboard</Link>
+        </div>
       </div>
 
       <CandidateTable rows={visible} freshIds={freshIds} onSelect={setSelected}

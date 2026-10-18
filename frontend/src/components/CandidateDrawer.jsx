@@ -160,6 +160,43 @@ export default function CandidateDrawer({ applicationId, onClose, onDecision }) 
             </div>
             )}
 
+            {report.llm_summary && (
+              <section className="rounded-xl bg-violet/10 p-4 ring-1 ring-violet/30">
+                <h3 className="flex items-center gap-2 font-semibold text-violet">
+                  AI review
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] tabular-nums ring-1 ${(report.rerank_adjustment ?? 0) >= 0
+                    ? 'bg-emerald-400/10 text-emerald-300 ring-emerald-400/30' : 'bg-rose-400/10 text-rose-300 ring-rose-400/30'}`}>
+                    {(report.rerank_adjustment ?? 0) >= 0 ? '+' : '−'}{Math.round(Math.abs(report.rerank_adjustment ?? 0) * 100)}%
+                  </span>
+                  {report.llm_summary.depth_vs_breadth && (
+                    <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-dim ring-1 ring-white/10">
+                      {report.llm_summary.depth_vs_breadth}
+                    </span>
+                  )}
+                </h3>
+                <p className="mt-2 whitespace-pre-line text-sm leading-snug text-ink/85">{report.llm_summary.summary}</p>
+                {(report.llm_summary.red_flags || []).length > 0 && (
+                  <ul className="mt-2 space-y-0.5 text-xs text-rose-200/90">
+                    {report.llm_summary.red_flags.map((f, i) => <li key={i}>⚑ {f}</li>)}
+                  </ul>
+                )}
+                {(report.llm_summary.must_have_coverage || []).length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {report.llm_summary.must_have_coverage.map((c, i) => (
+                      <span key={i} title={c.evidence}
+                            className={`rounded-full px-2 py-0.5 text-[11px] ring-1 ${/none|missing/i.test(c.evidence || '')
+                              ? 'bg-rose-400/10 text-rose-300 ring-rose-400/30' : 'bg-emerald-400/10 text-emerald-300 ring-emerald-400/30'}`}>
+                        {c.skill}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <p className="mt-2 text-[11px] text-dim/70">
+                  {report.llm_summary.model} · a nudge of at most ±10% on the formula score — the formula stays in charge
+                </p>
+              </section>
+            )}
+
             {report.components && (
               <section>
                 <h3 className="mb-2 font-semibold">Score breakdown</h3>

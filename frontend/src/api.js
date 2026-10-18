@@ -28,6 +28,9 @@ export const api = {
     }
     return { total: first.total, items }
   },
+  // Phase 8: LLM rerank of the top 50 — starts in the background, results stream over SSE
+  rerank: (jobId) => request(`/api/jobs/${jobId}/rerank`, { method: 'POST' }),
+  rerankStatus: (jobId) => request(`/api/jobs/${jobId}/rerank`),
   report: (applicationId) => request(`/api/candidates/${applicationId}/report`),
   decide: (applicationId, decision, reason) =>
     request(`/api/candidates/${applicationId}/decision`, {

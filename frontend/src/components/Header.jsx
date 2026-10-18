@@ -17,7 +17,22 @@ function useClickOutside(onOutside) {
   return ref
 }
 
+/** Total Kafka backlog across every worker (the Phase 8 lag widget) — polled every 5s. */
+function useQueued() {
+  const [queued, setQueued] = useState(null)
+  useEffect(() => {
+    let alive = true
+    const tick = () => fetch('/api/admin/lag').then((r) => r.json())
+      .then((d) => alive && setQueued(d.totalLag ?? null)).catch(() => alive && setQueued(null))
+    tick()
+    const id = setInterval(tick, 5000)
+    return () => { alive = false; clearInterval(id) }
+  }, [])
+  return queued
+}
+
 export default function Header() {
+  const queued = useQueued()
   const navigate = useNavigate()
   const location = useLocation()
   const [params] = useSearchParams()
@@ -52,8 +67,9 @@ export default function Header() {
       <a href="http://localhost:8085" target="_blank" rel="noreferrer"
          title="Open Kafka UI — the stream behind this dot"
          className="hidden items-center gap-1.5 rounded-full bg-white/5 px-2.5 py-1 text-[11px] text-dim ring-1 ring-white/10 transition hover:text-ink sm:flex">
-        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]" />
-        pipeline live
+        <span className={`h-1.5 w-1.5 animate-pulse rounded-full ${queued > 0
+          ? 'bg-marigold shadow-[0_0_8px_rgba(228,149,43,0.9)]' : 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]'}`} />
+        {queued > 0 ? <span className="tabular-nums text-marigold">{queued.toLocaleString()} queued</span> : 'pipeline live'}
       </a>
 
       <div className="relative">

@@ -72,6 +72,12 @@ export default function CandidateTable({ rows, freshIds = new Set(), onSelect, s
                     −{pts(row.fraudPenalty)} fraud
                   </span>
                 )}
+                {row.rerankAdjustment != null && row.rerankAdjustment !== 0 && (
+                  <span className={`block text-[10px] tabular-nums ${row.rerankAdjustment > 0 ? 'text-emerald-300' : 'text-rose-300'}`}
+                        title="AI rerank: a bounded nudge (max ±10%) on the formula score">
+                    AI {row.rerankAdjustment > 0 ? '+' : '−'}{Math.round(Math.abs(row.rerankAdjustment) * 100)}%
+                  </span>
+                )}
               </td>
               <td className="px-4 py-3"><ScoreBars components={row.components} compact /></td>
               <td className="px-4 py-3 text-ink/80">
