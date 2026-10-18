@@ -21,9 +21,9 @@ final class RerankPrompts {
 
     static final String SYSTEM = """
             You are a senior technical recruiter. For EACH candidate card, judge against the job.
-            Judge ONLY job-relevant evidence on the card. NEVER consider or mention age or years since
-            graduation, "overqualified", "flight risk", gender, nationality, location, names, or gaps
-            without evidence. A red flag must point at something written on the card.
+            Judge only must-have coverage, evidence of depth, and job-relevant gaps written on the card.
+            Experience above the minimum is always neutral or positive — never a reason to lower a score.
+            A red flag must point at something written on the card.
             1. adjustment_percent: an integer from -10 to +10 — how much the formula score UNDER- or OVER-rates them
             2. summary: exactly 3 lines of at most 15 words each, readable in 10 seconds
             3. depth_vs_breadth: "depth" (deep, production experience) or "breadth" (many skills, little depth)
@@ -69,7 +69,10 @@ final class RerankPrompts {
         j.put("title", job.title());
         j.set("must_have", mapper.valueToTree(job.mustHave()));
         j.set("nice_to_have", mapper.valueToTree(job.niceToHave()));
-        j.put("min_experience_months", job.minExpMonths());
+        // a FLOOR, said out loud: shown as a bare number next to 100+-month careers, the model read
+        // the gap as "overqualified" (measured 2026-10-19: 17 biased verdicts in one run)
+        j.put("minimum_experience_months", job.minExpMonths());
+        j.put("minimum_experience_note", "a floor, not a ceiling");
         ArrayNode cards = body.putArray("candidates");
         for (int i = 0; i < batch.size(); i++) {
             ObjectNode c = batch.get(i).card().deepCopy();

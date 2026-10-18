@@ -51,7 +51,7 @@ public class RerankCards {
             JsonNode p = mapper.readTree(profileJson == null ? "{}" : profileJson);
             card.put("formula_score", Math.round(matchScore * 10) / 10.0);
             card.put("experience_months", p.path("derived").path("total_experience_months").asInt(0));
-            card.put("seniority", p.path("derived").path("seniority").asText(""));
+            // no "seniority" label ("lead", "senior"): it invited "overqualified" — the months and roles are the evidence
             card.set("skills", p.path("skills"));
             ArrayNode roles = card.putArray("roles");
             for (JsonNode job : p.path("experience")) {

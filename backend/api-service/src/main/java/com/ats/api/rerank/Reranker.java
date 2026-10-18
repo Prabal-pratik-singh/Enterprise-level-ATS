@@ -57,6 +57,13 @@ public class Reranker {
             log.info("rerank: {} candidate(s) without a verdict — asking once more", unjudged.size());
             unjudged = judgeAll(client, job, jobId, unjudged, model);
         }
+        for (RerankCard card : unjudged) {
+            try {
+                recorder.clear(jobId, card.applicationId(), "no unbiased verdict this run");   // never keep a stale one
+            } catch (Exception e) {
+                log.warn("could not clear the old rerank verdict of {}: {}", card.applicationId(), e.getMessage());
+            }
+        }
         log.info("rerank of job {} done: {}/{} candidates judged by {} in {}s", jobId,
                 cards.size() - unjudged.size(), cards.size(), model, (System.currentTimeMillis() - t0) / 1000);
     }

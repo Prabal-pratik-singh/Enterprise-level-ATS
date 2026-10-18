@@ -51,4 +51,24 @@ public class RerankRecorder {
         outbox.append(Topics.SHORTLIST_UPDATED, app.getId(), jobId, Map.of(
                 "status", app.getStatus().name(), "reason", "reranked"));
     }
+
+    /**
+     * No accepted verdict this run: back to the plain formula score. Never keep an OLDER verdict —
+     * found 2026-10-19: discarded (biased) new verdicts had left biased old ones in place.
+     */
+    @Transactional
+    public void clear(UUID jobId, UUID applicationId, String reason) throws Exception {
+        Score score = scores.findByApplicationId(applicationId).orElse(null);
+        Application app = applications.findById(applicationId).orElse(null);
+        if (score == null || app == null) {
+            return;
+        }
+        boolean hadVerdict = score.getLlmSummary() != null || score.getRerankAdjustment() != 0.0;
+        score.updateRerank(0.0, null);
+        scores.save(score);
+        auditTrail.save(new ApplicationEvent(applicationId, "RERANK_SKIPPED", mapper.writeValueAsString(Map.of(
+                "reason", reason, "previous_verdict_removed", hadVerdict))));
+        outbox.append(Topics.SHORTLIST_UPDATED, applicationId, jobId, Map.of(
+                "status", app.getStatus().name(), "reason", "rerank skipped"));
+    }
 }

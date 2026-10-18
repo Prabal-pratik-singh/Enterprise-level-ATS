@@ -138,6 +138,56 @@ class RerankTest {
     }
 
     @Test
+    void aCandidateWithoutAnAcceptedVerdictIsResetNeverLeftWithAStaleOne() {
+        ForgetfulLlm llm = new ForgetfulLlm();   // answers only id 1 of each batch
+        java.util.List<UUID> recorded = new java.util.ArrayList<>();
+        java.util.List<UUID> cleared = new java.util.ArrayList<>();
+        RerankRecorder recorder = new RerankRecorder(null, null, null, null, mapper) {
+            @Override
+            public void record(UUID jobId, RerankPrompts.Verdict v) {
+                recorded.add(v.applicationId());
+            }
+
+            @Override
+            public void clear(UUID jobId, UUID applicationId, String reason) {
+                cleared.add(applicationId);
+            }
+        };
+        var beans = new org.springframework.beans.factory.support.StaticListableBeanFactory();
+        beans.addBean("llm", llm);
+        JobBrief.Loader briefs = new JobBrief.Loader(null, mapper) {
+            @Override
+            public JobBrief forJob(UUID jobId) {
+                return new JobBrief("Backend", List.of("java"), List.of(), 24);
+            }
+        };
+        var props = new com.ats.llm.LlmProperties("groq", 5, 60, null,
+                new com.ats.llm.LlmProperties.Groq("k", "openai/gpt-oss-20b", "openai/gpt-oss-120b"), null);
+        List<RerankCard> six = java.util.stream.IntStream.range(0, 6).mapToObj(i -> card("C" + i)).toList();
+
+        new Reranker(beans.getBeanProvider(com.ats.llm.LlmClient.class), props, briefs, recorder, mapper)
+                .run(UUID.randomUUID(), six);
+
+        assertThat(recorded).hasSize(3);          // 2 in the first pass + 1 in the retry round
+        assertThat(cleared).hasSize(3);           // the other 3 go back to the formula score
+        assertThat(recorded).doesNotContainAnyElementsOf(cleared);
+    }
+
+    @Test
+    void thePromptStatesTheFloorRuleWithoutNamingTheTriggerWords() {
+        String user = RerankPrompts.user(mapper, new JobBrief("Backend", List.of("java"), List.of(), 24), batch);
+        assertThat(RerankPrompts.SYSTEM).contains("Experience above the minimum is always neutral or positive");
+        assertThat(RerankPrompts.SYSTEM.toLowerCase()).doesNotContain("overqualified", "flight risk");
+        assertThat(user).contains("\"minimum_experience_months\":24", "a floor, not a ceiling");
+    }
+
+    @Test
+    void cardsNoLongerCarryASeniorityLabel() {
+        assertThat(batch.get(0).card().has("seniority")).isFalse();
+        assertThat(batch.get(0).card().path("experience_months").asInt()).isEqualTo(60);   // the evidence stays
+    }
+
+    @Test
     void noLlmMeansA503NotACrash() {
         Reranker noLlm = new Reranker(new org.springframework.beans.factory.support.StaticListableBeanFactory()
                 .getBeanProvider(com.ats.llm.LlmClient.class), null, null, null, mapper);
