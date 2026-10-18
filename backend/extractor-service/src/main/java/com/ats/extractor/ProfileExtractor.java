@@ -43,27 +43,40 @@ public class ProfileExtractor {
     private final UnmatchedSkills unmatchedSkills;
     private final ExperienceMath math;
     private final ObjectMapper mapper;
+    private final RuleExtractor rules;
 
     public ProfileExtractor(LlmClient llm, ProfileValidator validator, SkillTaxonomy taxonomy,
-                            UnmatchedSkills unmatchedSkills, ExperienceMath math, ObjectMapper mapper) {
+                            UnmatchedSkills unmatchedSkills, ExperienceMath math, ObjectMapper mapper,
+                            RuleExtractor rules) {
         this.llm = llm;
         this.validator = validator;
         this.taxonomy = taxonomy;
         this.unmatchedSkills = unmatchedSkills;
         this.math = math;
         this.mapper = mapper;
+        this.rules = rules;
     }
 
     /** What the recorder needs: the JSON plus the numbers that go in columns/events. */
     public record ExtractedProfile(ObjectNode profile, double completeness,
-                                   int totalExperienceMonths, int skillsCount) {
+                                   int totalExperienceMonths, int skillsCount,
+                                   String method) {   // "llm" | "rules" (load test) — recorded in the audit trail
     }
 
+    /** A real resume: always the LLM. */
     public ExtractedProfile extract(String resumeText) {
+        return extract(resumeText, false);
+    }
+
+    /**
+     * loadTest = the application came from seed.sh --bulk: read the synthetic layout with rules,
+     * and if that fails, FAIL — never fall back to the LLM (10K fallbacks would burn the daily quota).
+     */
+    public ExtractedProfile extract(String resumeText, boolean loadTest) {
         String text = resumeText.length() > MAX_TEXT_CHARS
                 ? resumeText.substring(0, MAX_TEXT_CHARS) : resumeText;
 
-        ObjectNode profile = askWithOneRetry(text);
+        ObjectNode profile = loadTest ? byRules(text) : askWithOneRetry(text);
 
         fillContactFallback(profile, text);   // the regex net under the LLM
         normalizeSkills(profile);             // canonical spellings + unknown logging
@@ -76,7 +89,18 @@ public class ProfileExtractor {
         derived.put("seniority", math.seniority(months));
         derived.put("completeness", completeness);
 
-        return new ExtractedProfile(profile, completeness, months, profile.path("skills").size());
+        return new ExtractedProfile(profile, completeness, months, profile.path("skills").size(),
+                loadTest ? "rules" : "llm");
+    }
+
+    /** Rules output goes through the SAME schema check as an LLM answer — invalid → exception → DLQ. */
+    private ObjectNode byRules(String text) {
+        ObjectNode profile = rules.extract(text);
+        Attempt attempt = judge(profile.toString());
+        if (!attempt.valid()) {
+            throw new IllegalStateException("rule extraction produced an invalid profile: " + attempt.errors());
+        }
+        return attempt.profile();
     }
 
     /** One honest question, one corrective retry, one last try with the stronger model, then give up loudly. */

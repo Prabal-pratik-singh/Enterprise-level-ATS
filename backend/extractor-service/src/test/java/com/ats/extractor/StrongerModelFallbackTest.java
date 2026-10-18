@@ -50,7 +50,7 @@ class StrongerModelFallbackTest {
         ObjectMapper mapper = new ObjectMapper();
         // UnmatchedSkills is null on purpose: every skill in VALID is in the dictionary, so it is never called
         return new ProfileExtractor(llm, new ProfileValidator(mapper), new SkillTaxonomy(mapper), null,
-                new ExperienceMath(), mapper);
+                new ExperienceMath(), mapper, new RuleExtractor(mapper));
     }
 
     @Test

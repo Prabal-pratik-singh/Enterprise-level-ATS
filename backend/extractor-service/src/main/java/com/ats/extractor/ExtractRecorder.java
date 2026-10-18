@@ -87,7 +87,8 @@ public class ExtractRecorder {
         auditTrail.save(new ApplicationEvent(app.getId(), "EXTRACTED", json(Map.of(
                 "skills_count", result.skillsCount(),
                 "total_experience_months", result.totalExperienceMonths(),
-                "completeness", result.completeness()))));
+                "completeness", result.completeness(),
+                "method", result.method()))));   // "rules" only for load-test applications
 
         // Fan-out point: matcher (Ph5), dedup+fraud (Ph6) and embedder (Ph7)
         // will ALL consume this one event — the board's "three checks in parallel"

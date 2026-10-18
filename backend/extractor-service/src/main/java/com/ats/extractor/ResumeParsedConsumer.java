@@ -1,6 +1,8 @@
 package com.ats.extractor;
 
 import com.ats.config.S3Properties;
+import com.ats.domain.Application;
+import com.ats.domain.ApplicationRepository;
 import com.ats.events.EventEnvelope;
 import com.ats.events.ProcessedEvents;
 import com.ats.events.Topics;
@@ -31,15 +33,18 @@ public class ResumeParsedConsumer {
     private final S3Properties s3Props;
     private final ProfileExtractor extractor;
     private final ExtractRecorder recorder;
+    private final ApplicationRepository applications;
 
     public ResumeParsedConsumer(ObjectMapper mapper, ProcessedEvents processed, S3Client s3,
-                                S3Properties s3Props, ProfileExtractor extractor, ExtractRecorder recorder) {
+                                S3Properties s3Props, ProfileExtractor extractor, ExtractRecorder recorder,
+                                ApplicationRepository applications) {
         this.mapper = mapper;
         this.processed = processed;
         this.s3 = s3;
         this.s3Props = s3Props;
         this.extractor = extractor;
         this.recorder = recorder;
+        this.applications = applications;
     }
 
     @KafkaListener(topics = Topics.RESUME_PARSED)
@@ -62,7 +67,10 @@ public class ResumeParsedConsumer {
             throw new IllegalStateException("parsed.json has no text for application " + event.applicationId());
         }
 
-        ProfileExtractor.ExtractedProfile result = extractor.extract(resumeText); // the slow, smart part
+        // load-test applications (seed.sh --bulk) are read by rules; every real resume by the LLM
+        boolean loadTest = applications.findById(event.applicationId())
+                .map(Application::isLoadTest).orElse(false);
+        ProfileExtractor.ExtractedProfile result = extractor.extract(resumeText, loadTest); // the slow, smart part
 
         recorder.recordSuccess(event, result);
         log.info("extracted application {}: {} skills, {} months experience, completeness {}",
