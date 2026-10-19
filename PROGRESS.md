@@ -34,7 +34,7 @@
 - **2026-08-07 · Kafka runs as `user: root`** in compose — the apache/kafka image's non-root user can't write a fresh named-volume mountpoint; acceptable for a local demo.
 - **2026-08-07 · Host port conflicts**: stopped the unrelated `sahayak-backend`/`sahayak-postgres` containers that held spec-locked ports 8080/5432 (restore: `docker start sahayak-backend sahayak-postgres`). `sahayak-ollama` (11434) and `sahayak-frontend` (5173) stay up until Phases 4/5 need those ports.
 - **2026-08-07 · No host Python** — the Phase 2 resume generator will run via a one-shot `python:3.12-slim` container instead of a host install.
-- **2026-08-07 · Spec archived** verbatim as `ATS-BUILD-PROMPT.md` so any session can consult it.
+- **2026-08-07 · Spec archived** in the repo while building; removed on 2026-10-20 (internal build instructions, not project documentation). It remains in the git history.
 - **2026-08-07 · Docker/WSL2 memory is ~7.4 GiB** (default cap, no `.wslconfig`). Fine through Phase 3; before Phase 4 (Ollama) the plan is to raise it to ~12 GB via `C:\Users\ASUS\.wslconfig` with the user's OK.
 - **2026-08-09 · Presigner signs for a public endpoint** (`S3_PUBLIC_ENDPOINT`, default `http://localhost:9000`): the SigV4 signature covers the Host header, so URLs must be signed for the address the uploading client actually hits — not the in-network `minio:9000`. Cloud swap stays an env change.
 - **2026-08-09 · Seed job has a fixed UUID** (`00000000-0000-0000-0000-000000000001`) so tools and later DoD commands can target it deterministically.
