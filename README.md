@@ -12,7 +12,12 @@ Swapping MinIO→S3, Compose→K8s+KEDA, and Ollama→Bedrock takes the same des
 
 **Honest demo simplifications:** no auth (single demo recruiter), no ClamAV
 (magic-byte validation instead), no Debezium (simple polling outbox), no
-field-level encryption, no Kubernetes.
+field-level encryption, no Kubernetes. The 10K load test reads its synthetic
+resumes with **rules instead of the LLM** (free-tier Groq allows ~1,000 calls a
+day); every real upload still goes through the LLM. The AI rerank runs in the API
+service rather than the matcher (the matcher has no HTTP surface).
+
+> The rehearsed interview walkthrough, with measured numbers: [DEMO.md](DEMO.md).
 
 > Build status by phase: see [PROGRESS.md](PROGRESS.md).
 
@@ -200,3 +205,40 @@ presigned PUTs so resume bytes never transit the API.
   so); without OpenSearch it returns a clear 503 while the rest keeps working.
 - Dashboard: a **Talent Search** page with a filter sidebar, match-source badges
   and per-list ranks.
+
+### Phase 8 — LLM rerank, 10K load test, and what it taught us
+- **LLM rerank** (`POST /api/jobs/{id}/rerank`): the top 50 candidates go to the
+  model in compact evidence cards (5 per call, verdict-first schema) and each
+  gets a 3-line summary, must-have coverage, depth vs breadth, red flags — and a
+  score nudge of **at most ±10%**, enforced in code and by a database CHECK.
+  Runs in the background; results stream to the page over SSE.
+- **Fairness, found the hard way:** the model kept writing "overqualified —
+  flight risk". The cause was our own Phase 5 formula, which docked experience
+  for anyone with 3× the requirement and printed that label — an
+  age-discrimination proxy that hit 263 of 359 candidates. Removed, everyone
+  re-scored by replaying Kafka, and any AI verdict that still leans on such a
+  reason is discarded whole (the candidate keeps the formula score).
+- **10,000 resumes through the real API** in ~11 minutes with 0 errors
+  (`./tools/seed.sh --bulk 10000`, 20 parallel workers), then
+  `--scale parser=8 --scale extractor=4`. The load test found two real bugs:
+  Postgres ran out of connections (workers × a default pool of 10 > 100), and the
+  parser's 500-record batches outlived Kafka's poll interval so progress was
+  never committed. Both fixed; the backlog drains to 0. It also showed the limits
+  of one laptop honestly — partition skew and a saturated CPU meant no clean 8×
+  speed-up here (see DEMO.md for how to measure it properly).
+- Real resumes are protected throughout: bulk uploads take the name and email
+  from the resume itself, extraction falls back to a stronger model when the
+  small one returns invalid JSON, and network blips are waited out instead of
+  failing the resume.
+
+## From this laptop to 500K applicants per job
+
+| Here | At 500K | Measured reason |
+|---|---|---|
+| Compose + `--scale` | Kubernetes + KEDA scaling on Kafka lag | lag is the load signal Live Flow already shows |
+| 12 partitions | ≥ max consumers | one partition = one consumer at a time |
+| Postgres (200 conns) | + PgBouncer, read replicas | 8 parsers already exhausted 100 connections |
+| MinIO | S3 | same SDK — an env change |
+| Groq free tier / Ollama | Bedrock-style provisioned throughput | ~1,000 calls/day free; 500K × ~2.5–3K tokens ≈ 1.25–1.5B tokens |
+| CPU embeddings, 0.27 s each | GPU / managed embeddings | 500K × 0.27 s ≈ 37 CPU-hours |
+| Polling outbox | Debezium CDC | lower latency, no polling |
