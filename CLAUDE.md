@@ -23,7 +23,8 @@ test inside the Maven container. `MSYS_NO_PATHCONV=1` stops Git Bash from rewrit
 | Seed resumes (LLM path) | `./tools/seed.sh N` |
 | Load test (rules path) | `./tools/seed.sh --bulk N` (runs inside a container; ~100 resumes per 6 s) |
 | Scale out / back | `docker compose up -d --no-recreate --scale parser=8 --scale extractor=4 parser extractor` (then `=1`) |
-| Queue backlog | `curl -s localhost:8082/api/admin/lag` |
+| Recruiter token for curl | see "Recruiter token" in DEMO.md (signs in with `RECRUITER_*` from `.env`) |
+| Queue backlog | `curl -s localhost:8082/api/admin/lag -H "Authorization: Bearer $TOKEN"` |
 | Database shell | `docker exec -it ats-postgres-1 psql -U ats -d ats` |
 
 ## Architecture (10 lines)
@@ -39,6 +40,8 @@ test inside the Maven container. `MSYS_NO_PATHCONV=1` stops Git Bash from rewrit
 - Services never call each other; every hop is a Kafka event written through the outbox.
 - Every consumer is idempotent via `processed_events` (the indexer re-reads Postgres instead).
 - `frontend/` is React + Vite + Tailwind, served by nginx on 5174 with `/api` proxied (SSE unbuffered).
+- api-service also signs people in (`com.ats.auth`): 15-minute JWT access tokens + a rotating 7-day
+  refresh cookie. Every endpoint not listed as public in `SecurityConfig` is recruiter-only.
 
 ## Traps
 
@@ -47,6 +50,11 @@ test inside the Maven container. `MSYS_NO_PATHCONV=1` stops Git Bash from rewrit
 - **Shell scripts** must stay LF (`.gitattributes` enforces `*.sh eol=lf`); they are bind-mounted
   into Linux containers. `*.pdf` is binary.
 - **Never print secrets:** do not `env | grep GROQ_` — it prints the API key. DEMO.md shows a safe check.
+  Never `source .env` either: a malformed line makes the shell echo it, value included.
+- **Sign-in config:** the API refuses to start without `JWT_SECRET` (32+ characters) in `.env`. The demo
+  recruiter is created once from `RECRUITER_EMAIL` / `RECRUITER_PASSWORD`; changing them in `.env`
+  later does not change an existing account. The UI reads SSE through `fetch` (EventSource cannot
+  send the token) — do not reintroduce `EventSource`.
 - **Groq free tier:** ~1,000 requests/day and 8,000 tokens/min per model; `gpt-oss-120b` (the
   fallback / rerank model) also has a 200,000 tokens/day cap — one full rerank ≈ 35–40K tokens.
 - **The network here is flaky** (DNS failures to Maven Central / Groq). Image builds can sit
@@ -66,7 +74,8 @@ test inside the Maven container. `MSYS_NO_PATHCONV=1` stops Git Bash from rewrit
 
 ## Review non-issues (deliberate demo choices — do not flag)
 
-- No authentication: single demo recruiter by design.
+- The Part 1 apply flow (`POST /api/candidates`, `/api/jobs/*/applications`, resume `upload-url` /
+  `complete`) is public on purpose: applicants never need an account, and `seed.sh` uses it.
 - Polling outbox relay instead of Debezium; magic-byte file checks instead of ClamAV.
 - One shared Postgres for all services (per-service data ownership is the documented next step).
 - Load-test applications (`load_test = true`) are read by rules, not the LLM, because of free-tier limits.

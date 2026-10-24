@@ -57,7 +57,9 @@ Containers start in ~30–60 s and Kafka splits the 12 partitions between them.
 
 ## 5. Watch it drain
 
-Lag falls to 0 (`curl -s localhost:8082/api/admin/lag`). Then scale back:
+Lag falls to 0 — the header's "N queued" pill shows it, or from a shell
+(`curl -s localhost:8082/api/admin/lag -H "Authorization: Bearer $TOKEN"`, see "Recruiter token" at the end).
+Then scale back:
 ```bash
 docker compose up -d --no-recreate --scale parser=1 --scale extractor=1 parser extractor
 ```
@@ -128,3 +130,16 @@ docker run --rm --env-file .env curlimages/curl:8.11.1 sh -c \
   'curl -s -o /dev/null -w "Groq HTTP %{http_code}\n" -H "Authorization: Bearer $GROQ_API_KEY" https://api.groq.com/openai/v1/models'
 ```
 Never `env | grep GROQ_` — that prints the key.
+
+## Recruiter token (for curl)
+
+Every recruiter endpoint needs a sign-in token (15 minutes). The dashboard signs in with
+`RECRUITER_EMAIL` / `RECRUITER_PASSWORD` from `.env`; from Git Bash:
+
+```bash
+env_value() { sed -n "s/^$1=//p" .env | tr -d '\r'; }   # reads one value; never source .env (errors echo its lines)
+TOKEN=$(curl -s -X POST localhost:8082/api/auth/login -H 'Content-Type: application/json' \
+  -d "{\"email\":\"$(env_value RECRUITER_EMAIL)\",\"password\":\"$(env_value RECRUITER_PASSWORD)\"}" \
+  | sed -n 's/.*"accessToken":"\([^"]*\)".*/\1/p')
+curl -s localhost:8082/api/admin/lag -H "Authorization: Bearer $TOKEN"
+```

@@ -10,7 +10,7 @@ The architecture is the production architecture; scale is the only demo concessi
 Swapping MinIO→S3, Compose→K8s+KEDA, and Ollama→Bedrock takes the same design to
 500K — config, not redesign.
 
-**Honest demo simplifications:** no auth (single demo recruiter), no ClamAV
+**Honest demo simplifications:** one seeded demo recruiter account (sign-in since Part 2, no SSO), no ClamAV
 (magic-byte validation instead), no Debezium (simple polling outbox), no
 field-level encryption, no Kubernetes. The 10K load test reads its synthetic
 resumes with **rules instead of the LLM** (free-tier Groq allows ~1,000 calls a
