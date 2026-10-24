@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { api } from '../api'
+import { openEvents } from '../sse'
 import CandidateTable from '../components/CandidateTable'
 import CandidateDrawer from '../components/CandidateDrawer'
 import RerankButton from '../components/RerankButton'
@@ -25,12 +26,13 @@ export default function CandidatesPage() {
 
   useEffect(load, [load])
 
-  // Live updates: one EventSource per page visit. A scored candidate arrives
+  // Live updates: one event stream per page visit. A scored candidate arrives
   // as a full row — upsert it, re-sort by score, flash-highlight for 3s.
   useEffect(() => {
-    const source = new EventSource(`/api/jobs/${jobId}/events`)
-    source.addEventListener('candidate', (event) => {
-      const row = JSON.parse(event.data)
+    // leaving the page closes the stream (openEvents returns the close function)
+    return openEvents(`/api/jobs/${jobId}/events`, (type, data) => {
+      if (type !== 'candidate') return
+      const row = JSON.parse(data)
       setRows((current) => {
         const others = current.filter((r) => r.applicationId !== row.applicationId)
         const next = [...others, row]
@@ -42,7 +44,6 @@ export default function CandidatesPage() {
         const copy = new Set(ids); copy.delete(row.applicationId); return copy
       }), 3000)
     })
-    return () => source.close() // leaving the page closes the stream
   }, [jobId])
 
   // patch: extra fields a fraud review changes (CLEAR → penalty 0, final = match), then re-rank

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 // no Github icon: lucide removed brand icons — Code2 stands in for the repo link
-import { Search, Bell, ChevronDown, Code2, HeartPulse, Activity, Database } from 'lucide-react'
+import { Search, Bell, ChevronDown, Code2, HeartPulse, Activity, Database, LogOut } from 'lucide-react'
 import Avatar from './Avatar'
+import { api } from '../api'
+import { displayName, logout, useSession } from '../auth'
 
 /** Small hook: close a popover when the user clicks anywhere outside it. */
 function useClickOutside(onOutside) {
@@ -22,7 +24,7 @@ function useQueued() {
   const [queued, setQueued] = useState(null)
   useEffect(() => {
     let alive = true
-    const tick = () => fetch('/api/admin/lag').then((r) => r.json())
+    const tick = () => api.lag()
       .then((d) => alive && setQueued(d.totalLag ?? null)).catch(() => alive && setQueued(null))
     tick()
     const id = setInterval(tick, 5000)
@@ -33,6 +35,8 @@ function useQueued() {
 
 export default function Header() {
   const queued = useQueued()
+  const { user } = useSession()
+  const name = displayName(user?.email)
   const navigate = useNavigate()
   const location = useLocation()
   const [params] = useSearchParams()
@@ -91,17 +95,17 @@ export default function Header() {
       <div className="relative">
         <button onClick={() => setOpen(open === 'profile' ? null : 'profile')}
                 className="flex items-center gap-2.5 rounded-xl px-1.5 py-1 transition hover:bg-white/5">
-          <Avatar name="Demo Recruiter" size={32} />
+          <Avatar name={name} size={32} />
           <div className="hidden leading-tight text-left md:block">
-            <div className="text-sm font-medium">Demo Recruiter</div>
-            <div className="text-[11px] text-dim">Recruiter</div>
+            <div className="text-sm font-medium">{name}</div>
+            <div className="text-[11px] capitalize text-dim">{user?.role?.toLowerCase()}</div>
           </div>
           <ChevronDown size={14} className={`text-dim transition ${open === 'profile' ? 'rotate-180' : ''}`} />
         </button>
         {open === 'profile' && (
           <div className="popover absolute right-0 top-12 w-60 p-2">
-            <div className="px-3 py-2 text-xs text-dim">
-              Single-recruiter demo — no auth by design (see README).
+            <div className="truncate px-3 py-2 text-xs text-dim" title={user?.email}>
+              Signed in as <span className="text-ink">{user?.email}</span>
             </div>
             <a className={menuItem} href="https://github.com/Prabal-pratik-singh/Enterprise-level-ATS" target="_blank" rel="noreferrer">
               <Code2 size={15} /> Project on GitHub
@@ -115,6 +119,10 @@ export default function Header() {
             <a className={menuItem} href="http://localhost:9001" target="_blank" rel="noreferrer">
               <Database size={15} /> MinIO console
             </a>
+            <div className="my-1 h-px bg-white/10" />
+            <button onClick={logout} className={`${menuItem} w-full`}>
+              <LogOut size={15} /> Sign out
+            </button>
           </div>
         )}
       </div>

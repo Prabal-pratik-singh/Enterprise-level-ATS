@@ -1,8 +1,10 @@
 // Tiny fetch helpers — one place for paths, JSON parsing and error handling.
+import { authFetch } from './auth'
+
 async function request(path, options = {}) {
-  const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json' },
+  const res = await authFetch(path, {
     ...options,
+    headers: { 'Content-Type': 'application/json', ...options.headers },
   })
   if (!res.ok) throw new Error(`${options.method || 'GET'} ${path} → HTTP ${res.status}`)
   return res.status === 204 ? null : res.json()

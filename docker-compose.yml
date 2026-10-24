@@ -153,6 +153,10 @@ services:
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
       LLM_READ_TIMEOUT_SECONDS: "180"
       OLLAMA_BASE_URL: http://ollama:11434
+      # Part 2 sign-in (values from the gitignored .env): the API refuses to start without JWT_SECRET
+      JWT_SECRET: ${JWT_SECRET:-}
+      RECRUITER_EMAIL: ${RECRUITER_EMAIL:-recruiter@ats.local}
+      RECRUITER_PASSWORD: ${RECRUITER_PASSWORD:-}
       JAVA_OPTS: -XX:MaxRAMPercentage=75
     ports:
       # Host port 8082 (8080 belongs to another local stack); in-network it's still api:8080

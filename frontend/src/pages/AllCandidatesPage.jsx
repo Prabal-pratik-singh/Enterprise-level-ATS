@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../api'
+import { openEvents } from '../sse'
 import CandidateTable from '../components/CandidateTable'
 import CandidateDrawer from '../components/CandidateDrawer'
 
@@ -53,10 +54,10 @@ export default function AllCandidatesPage() {
   // one SSE stream per job keeps the merged table live too
   useEffect(() => {
     if (jobs.length === 0) return undefined
-    const sources = jobs.map((job) => {
-      const source = new EventSource(`/api/jobs/${job.id}/events`)
-      source.addEventListener('candidate', (event) => {
-        const row = { ...JSON.parse(event.data), jobId: job.id, jobTitle: job.title }
+    const closers = jobs.map((job) =>
+      openEvents(`/api/jobs/${job.id}/events`, (type, data) => {
+        if (type !== 'candidate') return
+        const row = { ...JSON.parse(data), jobId: job.id, jobTitle: job.title }
         setRows((current) => {
           const others = current.filter((r) => r.applicationId !== row.applicationId)
           const next = [...others, row]
@@ -67,10 +68,8 @@ export default function AllCandidatesPage() {
         setTimeout(() => setFreshIds((ids) => {
           const copy = new Set(ids); copy.delete(row.applicationId); return copy
         }), 3000)
-      })
-      return source
-    })
-    return () => sources.forEach((s) => s.close())
+      }))
+    return () => closers.forEach((close) => close())
   }, [jobs])
 
   // patch: extra fields a fraud review changes (CLEAR → penalty 0, final = match), then re-rank

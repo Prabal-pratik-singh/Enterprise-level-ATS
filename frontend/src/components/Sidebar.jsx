@@ -6,6 +6,7 @@ import {
   Database, Rocket, UploadCloud,
 } from 'lucide-react'
 import Avatar from './Avatar'
+import { displayName, useSession } from '../auth'
 
 // Real pages navigate; future phases show a "soon" tag; infra tools open the
 // REAL consoles (Kafka UI, MinIO) — a demo that shows its own engine room.
@@ -27,6 +28,7 @@ const INFRA = [
 const itemBase = 'flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors'
 
 export default function Sidebar() {
+  const { user } = useSession()
   // waiting fraud verdicts — a small poll keeps the badge honest on every page
   const [reviewCount, setReviewCount] = useState(0)
   useEffect(() => {
@@ -94,13 +96,13 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* recruiter card pinned to the bottom (single-recruiter demo: no auth by design) */}
+      {/* the signed-in recruiter, pinned to the bottom */}
       <div className="mt-auto shrink-0 rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
         <div className="flex items-center gap-2.5">
-          <Avatar name="Demo Recruiter" size={34} />
-          <div className="leading-tight">
-            <div className="text-sm font-medium">Demo Recruiter</div>
-            <div className="text-[11px] text-dim">single-recruiter demo</div>
+          <Avatar name={displayName(user?.email)} size={34} />
+          <div className="min-w-0 leading-tight">
+            <div className="truncate text-sm font-medium">{displayName(user?.email)}</div>
+            <div className="truncate text-[11px] text-dim" title={user?.email}>{user?.email}</div>
           </div>
         </div>
       </div>
