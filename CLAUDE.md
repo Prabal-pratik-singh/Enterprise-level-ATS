@@ -13,6 +13,7 @@ test inside the Maven container. `MSYS_NO_PATHCONV=1` stops Git Bash from rewrit
 | Run everything | `docker compose --profile search up -d` (core only: `docker compose up -d`) |
 | Dashboard / API | http://localhost:5174 · http://localhost:8082 (health: `/actuator/health`) |
 | Kafka UI / MinIO / OpenSearch | http://localhost:8085 · http://localhost:9001 · http://localhost:9200 |
+| Mailpit (every e-mail the app sends) | http://localhost:8025 — REST API under `/api/v1` (e.g. `/api/v1/search?query=to:%22a@test.dev%22`) |
 | Backend tests (one module + deps) | `MSYS_NO_PATHCONV=1 docker run --rm -v ats-m2:/root/.m2 -v "<abs path>/backend":/src -w /src maven:3.9-eclipse-temurin-21 mvn -B -q -pl <module> -am test` |
 | Test results | `<module>/target/surefire-reports/*.xml` (the `-q` run prints nothing on success) |
 | Type check (backend) | the same Maven run — compilation is the type check |
@@ -76,6 +77,8 @@ test inside the Maven container. `MSYS_NO_PATHCONV=1` stops Git Bash from rewrit
 
 - The Part 1 apply flow (`POST /api/candidates`, `/api/jobs/*/applications`, resume `upload-url` /
   `complete`) is public on purpose: applicants never need an account, and `seed.sh` uses it.
+- Mailpit catches every e-mail, so anyone who can open :8025 can read every verify link — a local
+  mail catcher, not a real inbox. Per-IP rate limits live in memory (one API instance, no Redis).
 - Polling outbox relay instead of Debezium; magic-byte file checks instead of ClamAV.
 - One shared Postgres for all services (per-service data ownership is the documented next step).
 - Load-test applications (`load_test = true`) are read by rules, not the LLM, because of free-tier limits.
