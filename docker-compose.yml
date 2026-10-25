@@ -157,6 +157,11 @@ services:
       JWT_SECRET: ${JWT_SECRET:-}
       RECRUITER_EMAIL: ${RECRUITER_EMAIL:-recruiter@ats.local}
       RECRUITER_PASSWORD: ${RECRUITER_PASSWORD:-}
+      # verify-email links: SMTP to Mailpit; links point at the dashboard (no depends_on: a stopped
+      # Mailpit only delays the mail — sign-up still works and "resend" sends a new link)
+      MAIL_HOST: mailpit
+      MAIL_PORT: "1025"
+      APP_PUBLIC_URL: http://localhost:5174
       JAVA_OPTS: -XX:MaxRAMPercentage=75
     ports:
       # Host port 8082 (8080 belongs to another local stack); in-network it's still api:8080
@@ -341,6 +346,15 @@ services:
     depends_on:
       - api   # nginx forwards /api to api:8080
     mem_limit: 64m
+
+  # ---------- Mailpit: catches every e-mail the app sends — nothing leaves the laptop ----------
+  # Web UI + REST API on http://localhost:8025; the API sends SMTP to mailpit:1025 inside the network
+  mailpit:
+    restart: unless-stopped
+    image: axllent/mailpit:v1.31.6
+    ports:
+      - "8025:8025"
+    mem_limit: 128m
 
   # ---------- Phase 7: docker compose --profile search up -d ----------
   opensearch:

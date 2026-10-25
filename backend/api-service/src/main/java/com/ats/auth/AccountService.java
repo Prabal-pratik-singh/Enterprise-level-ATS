@@ -5,6 +5,8 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
+import com.ats.domain.Candidate;
+import com.ats.domain.CandidateRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -22,12 +24,14 @@ public class AccountService {
 
     private final UserAccountRepository users;
     private final PasswordEncoder passwords;
+    private final CandidateRepository candidates;
     // compared against when the email is unknown, so "no such account" answers as slowly as "wrong password"
     private final String timingHash;
 
-    public AccountService(UserAccountRepository users, PasswordEncoder passwords) {
+    public AccountService(UserAccountRepository users, PasswordEncoder passwords, CandidateRepository candidates) {
         this.users = users;
         this.passwords = passwords;
+        this.candidates = candidates;
         this.timingHash = passwords.encode("timing-equalizer");
     }
 
@@ -52,8 +56,12 @@ public class AccountService {
         }
     }
 
-    /** The same answer, in about the same time, whether the email or the password was wrong. */
-    @Transactional(readOnly = true)
+    /**
+     * The same answer, in about the same time, whether the email or the password was wrong. A verified
+     * candidate also re-runs the account claim, so applications sent later with the same e-mail
+     * (the public apply form) show up too.
+     */
+    @Transactional
     public UserAccount logIn(String rawEmail, String password) {
         Optional<UserAccount> user = users.findByEmail(normalizeEmail(rawEmail));
         String attempt = password == null || tooLong(password) ? "" : password;
@@ -61,7 +69,11 @@ public class AccountService {
         if (!matches || user.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "wrong email or password");
         }
-        return user.get();
+        UserAccount account = user.get();
+        if (account.getRole() == Role.CANDIDATE && account.isEmailVerified()) {
+            candidates.claimByEmail(account.getEmail(), account.getId());
+        }
+        return account;
     }
 
     /** " Asha@Example.COM " → "asha@example.com" — the one spelling we store and look up. */
@@ -73,6 +85,10 @@ public class AccountService {
     static String emailProblem(String email) {
         if (email.length() > 254 || !EMAIL.matcher(email).matches()) {
             return "enter a valid email address";
+        }
+        if (email.endsWith(Candidate.PENDING_EMAIL_DOMAIN)) {
+            // bulk-upload placeholders: ".invalid" can never receive mail, and Mailpit would accept it anyway
+            return "this address cannot receive e-mail";
         }
         return null;
     }

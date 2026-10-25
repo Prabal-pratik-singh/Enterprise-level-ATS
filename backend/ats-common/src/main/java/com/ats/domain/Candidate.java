@@ -29,6 +29,12 @@ public class Candidate {
     @Column(name = "identity_source", nullable = false)
     private String identitySource;   // form | resume_pending | resume (V7)
 
+    // V10: the account this row belongs to, set only by a verified account claim (a native UPDATE in
+    // CandidateRepository). Read-only here on purpose: the extractor saves whole Candidate rows and
+    // would otherwise write back a stale NULL over a claim made a moment earlier.
+    @Column(name = "user_id", insertable = false, updatable = false)
+    private UUID userId;
+
     /** Placeholder emails end here: ".invalid" is reserved and can never be a real, reachable address. */
     public static final String PENDING_EMAIL_DOMAIN = "@intake.invalid";
 
@@ -102,6 +108,11 @@ public class Candidate {
 
     public String getIdentitySource() {
         return identitySource;
+    }
+
+    /** null = no account has claimed this application row. */
+    public UUID getUserId() {
+        return userId;
     }
 
     public Instant getCreatedAt() {

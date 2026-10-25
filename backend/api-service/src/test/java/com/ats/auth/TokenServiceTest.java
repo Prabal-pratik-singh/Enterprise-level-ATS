@@ -34,7 +34,7 @@ class TokenServiceTest {
     private final UserAccountRepository users = mock(UserAccountRepository.class);
     private final TokenService service = new TokenService(
             new NimbusJwtEncoder(new ImmutableSecret<>(SecurityConfig.signingKey(SECRET))), refreshTokens, users,
-            new AuthProperties(SECRET, Duration.ofMinutes(15), Duration.ofDays(7), false, null, null));
+            new AuthProperties(SECRET, Duration.ofMinutes(15), Duration.ofDays(7), false, null, null, null, null));
     private final UserAccount asha = new UserAccount("asha@test.dev", "hash", Role.CANDIDATE);
 
     private final Map<String, RefreshToken> table = new HashMap<>();   // stands in for refresh_tokens

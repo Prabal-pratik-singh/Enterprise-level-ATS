@@ -43,6 +43,7 @@ public class SecurityConfig {
                         // SSE completions and error pages re-enter the filter chain after the original
                         // request was already checked — re-checking them only breaks open streams
                         .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
+                        .requestMatchers("/api/auth/resend-verification").authenticated()   // before the /** rule
                         .requestMatchers("/api/auth/**", "/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/skills").permitAll()
                         // the public apply flow — Part 1 applicants never need an account

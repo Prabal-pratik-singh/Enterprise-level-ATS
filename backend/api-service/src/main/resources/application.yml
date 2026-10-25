@@ -25,6 +25,15 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
       acks: all
+  # C1: verify-email links. Mailpit in compose (nothing leaves the laptop); 3 s timeouts so a
+  # stopped mail server can never hang a sign-up (JavaMail's own default is to wait forever)
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    properties:
+      "[mail.smtp.connectiontimeout]": 3000
+      "[mail.smtp.timeout]": 3000
+      "[mail.smtp.writetimeout]": 3000
 
 server.error.include-message: always
 
@@ -43,6 +52,8 @@ app:
     cookie-secure: false   # the demo is plain http://localhost — set true behind HTTPS
     recruiter-email: ${RECRUITER_EMAIL:}
     recruiter-password: ${RECRUITER_PASSWORD:}
+    public-url: ${APP_PUBLIC_URL:http://localhost:5174}   # where links in e-mails point
+    mail-from: no-reply@ats.local
   # Phase 8 rerank — the same provider switch the extractor uses
   llm:
     provider: ${LLM_PROVIDER:ollama}

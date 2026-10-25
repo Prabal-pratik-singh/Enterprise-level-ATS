@@ -2,6 +2,7 @@ package com.ats.auth;
 
 import java.util.Optional;
 
+import com.ats.domain.CandidateRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
@@ -9,15 +10,19 @@ import org.springframework.web.server.ResponseStatusException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /** Sign-up and sign-in rules. BCrypt strength 4 keeps the test fast; production uses the default 10. */
 class AccountServiceTest {
 
     private final UserAccountRepository users = mock(UserAccountRepository.class);
+    private final CandidateRepository candidates = mock(CandidateRepository.class);
     private final BCryptPasswordEncoder passwords = new BCryptPasswordEncoder(4);
-    private final AccountService accounts = new AccountService(users, passwords);
+    private final AccountService accounts = new AccountService(users, passwords, candidates);
 
     @Test
     void emailsAreStoredInOneSpelling() {
@@ -26,6 +31,29 @@ class AccountServiceTest {
         assertThat(AccountService.emailProblem("asha")).isNotNull();
         assertThat(AccountService.emailProblem("asha@example")).isNotNull();
         assertThat(AccountService.emailProblem("asha k@example.com")).isNotNull();
+        // bulk-upload placeholders can never become accounts (Mailpit would accept their mail)
+        assertThat(AccountService.emailProblem("pending+1a2b3c4d@intake.invalid")).contains("cannot receive");
+    }
+
+    @Test
+    void aVerifiedCandidateReclaimsAtSignInSoLaterApplicationsShowUp() {
+        UserAccount prabal = new UserAccount("prabal@test.dev", passwords.encode("Passw0rd!x"), Role.CANDIDATE);
+        prabal.markEmailVerified();
+        when(users.findByEmail("prabal@test.dev")).thenReturn(Optional.of(prabal));
+
+        accounts.logIn("prabal@test.dev", "Passw0rd!x");
+
+        verify(candidates).claimByEmail("prabal@test.dev", prabal.getId());
+    }
+
+    @Test
+    void anUnverifiedSignInClaimsNothing() {
+        UserAccount stranger = new UserAccount("prabal@test.dev", passwords.encode("Passw0rd!x"), Role.CANDIDATE);
+        when(users.findByEmail("prabal@test.dev")).thenReturn(Optional.of(stranger));   // typed his e-mail, never verified
+
+        accounts.logIn("prabal@test.dev", "Passw0rd!x");
+
+        verify(candidates, never()).claimByEmail(anyString(), any());
     }
 
     @Test
