@@ -1,7 +1,12 @@
-// What a candidate sees of an application's status. The recruiter's pipeline states stay internal:
-// a fraud flag must look exactly like any other review (no tip-off), and a rejection is a neutral
+// What a candidate sees of an application's status. The API already sends candidate-facing values
+// (RECEIVED, IN_REVIEW, NOT_SELECTED, RESUME_UNREADABLE); the pipeline names below stay as a fallback.
+// A fraud flag must look exactly like any other review (no tip-off), and a rejection is a neutral
 // "not selected" — the reasons are shared only when a job opts in (Part 2, C5).
 const LABELS = {
+  RECEIVED: ['Received', 'neutral'],
+  IN_REVIEW: ['In review', 'active'],
+  NOT_SELECTED: ['Not selected', 'closed'],
+  RESUME_UNREADABLE: ["We couldn't read your resume", 'warn'],
   APPLIED: ['Received', 'neutral'],
   PARSED: ['Received', 'neutral'],
   EXTRACTED: ['Received', 'neutral'],

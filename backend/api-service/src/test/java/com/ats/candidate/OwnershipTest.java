@@ -12,6 +12,7 @@ import com.ats.auth.UserAccount;
 import com.ats.auth.UserAccountRepository;
 import com.ats.domain.Application;
 import com.ats.domain.ApplicationRepository;
+import com.ats.domain.ApplicationStatus;
 import com.ats.domain.Candidate;
 import com.ats.domain.CandidateRepository;
 import com.ats.domain.Job;
@@ -24,8 +25,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -88,7 +93,28 @@ class OwnershipTest {
         mvc.perform(get("/api/candidate/applications/" + app.getId()).header("Authorization", bearer(ravi)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.jobTitle").value("Backend Engineer — Java/Kafka"))
-                .andExpect(jsonPath("$.status").value("APPLIED"));
+                .andExpect(jsonPath("$.status").value("RECEIVED"));   // pipeline state APPLIED, candidate-facing
+    }
+
+    @Test
+    void aFraudFlagReadsLikeAnyOtherReview() throws Exception {
+        Application app = ravisApplication();
+        app.transitionTo(ApplicationStatus.FLAGGED_FOR_REVIEW);   // e.g. hidden white text was found
+        mvc.perform(get("/api/candidate/applications/" + app.getId()).header("Authorization", bearer(ravi)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_REVIEW"))
+                .andExpect(content().string(not(containsString("FLAG"))));   // no tip-off anywhere in the answer
+    }
+
+    @Test
+    void everyPipelineStatusHasACandidateFacingOne() {
+        for (ApplicationStatus status : ApplicationStatus.values()) {
+            assertThat(MyApplicationsController.forCandidate(status)).isNotNull();
+        }
+        assertThat(MyApplicationsController.forCandidate(ApplicationStatus.FLAGGED_FOR_REVIEW))
+                .isEqualTo(MyApplicationsController.forCandidate(ApplicationStatus.SCORED));
+        assertThat(MyApplicationsController.forCandidate(ApplicationStatus.REJECTED))
+                .isEqualTo(MyApplicationsController.CandidateFacingStatus.NOT_SELECTED);
     }
 
     @Test

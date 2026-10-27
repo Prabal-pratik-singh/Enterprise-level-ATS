@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 
 import com.ats.domain.Application;
 import com.ats.domain.ApplicationRepository;
+import com.ats.domain.ApplicationStatus;
 import com.ats.domain.Candidate;
 import com.ats.domain.CandidateRepository;
 import com.ats.domain.Job;
@@ -25,13 +26,32 @@ import org.springframework.web.server.ResponseStatusException;
 /**
  * A candidate's own applications — the ones their verified e-mail claimed. The caller's identity
  * always comes from the signed token (never from the URL), and every single-item read checks
- * ownership: asking for someone else's application id answers 403.
+ * ownership: asking for someone else's application id answers 403. Statuses are candidate-facing.
  */
 @RestController
 @RequestMapping("/api/candidate/applications")
 public class MyApplicationsController {
 
-    public record MyApplication(UUID applicationId, String jobTitle, String status, Instant appliedAt) {
+    public record MyApplication(UUID applicationId, String jobTitle, CandidateFacingStatus status, Instant appliedAt) {
+    }
+
+    /**
+     * What a candidate may see. The pipeline's own states stay internal: a fraud flag reads exactly like
+     * any other review (telling someone "you were flagged" teaches them to hide better), and a rejection
+     * is a neutral "not selected" — reasons are shared only when a job opts in (Part 2, C5).
+     */
+    public enum CandidateFacingStatus {
+        RECEIVED, IN_REVIEW, NOT_SELECTED, RESUME_UNREADABLE
+    }
+
+    /** No "default" branch on purpose: a new pipeline status will not compile until someone decides this. */
+    static CandidateFacingStatus forCandidate(ApplicationStatus status) {
+        return switch (status) {
+            case APPLIED, PARSED, EXTRACTED -> CandidateFacingStatus.RECEIVED;
+            case SCORED, FLAGGED_FOR_REVIEW, SHORTLISTED -> CandidateFacingStatus.IN_REVIEW;
+            case REJECTED -> CandidateFacingStatus.NOT_SELECTED;
+            case PARSE_FAILED -> CandidateFacingStatus.RESUME_UNREADABLE;
+        };
     }
 
     private final ApplicationRepository applications;
@@ -64,7 +84,8 @@ public class MyApplicationsController {
     }
 
     private static MyApplication view(Application app, Function<UUID, String> titleOf) {
-        return new MyApplication(app.getId(), titleOf.apply(app.getJobId()), app.getStatus().name(), app.getCreatedAt());
+        return new MyApplication(app.getId(), titleOf.apply(app.getJobId()), forCandidate(app.getStatus()),
+                app.getCreatedAt());
     }
 
     private static UUID callerId(Jwt token) {
