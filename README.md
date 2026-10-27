@@ -33,7 +33,9 @@ docker compose up -d --build
 | Kafka UI (lag visualizer) | http://localhost:8085 |
 | MinIO console | http://localhost:9001 (minioadmin / minioadmin) |
 | Postgres (pgvector) | localhost:5434 (ats / ats) |
-| Frontend (container, nginx) | http://localhost:5174 |
+| Recruiter console (container, nginx) | http://localhost:5174 — sign in with `RECRUITER_EMAIL` / `RECRUITER_PASSWORD` from `.env` |
+| Candidate portal (Part 2) | http://localhost:5174/candidate |
+| Mailpit — every e-mail the app sends | http://localhost:8025 |
 | Ollama (from Phase 4, profile `llm`) | http://localhost:11435 |
 | OpenSearch (from Phase 7, profile `search`) | http://localhost:9200 |
 
@@ -41,8 +43,9 @@ Host ports are picked to coexist with other local stacks; inside the compose
 network the services still use their native ports (`api:8080`, `postgres:5432`,
 `ollama:11434`).
 
-No `.env` needed — compose ships working defaults; copy `.env.example` to `.env`
-to override.
+Copy `.env.example` to `.env` and set `JWT_SECRET` (32+ characters, e.g.
+`openssl rand -base64 48`) and `RECRUITER_PASSWORD` — the API refuses to start
+without a JWT secret; everything else has working defaults.
 
 ## How it's put together
 
@@ -242,3 +245,33 @@ presigned PUTs so resume bytes never transit the API.
 | Groq free tier / Ollama | Bedrock-style provisioned throughput | ~1,000 calls/day free; 500K × ~2.5–3K tokens ≈ 1.25–1.5B tokens |
 | CPU embeddings, 0.27 s each | GPU / managed embeddings | 500K × 0.27 s ≈ 37 CPU-hours |
 | Polling outbox | Debezium CDC | lower latency, no polling |
+
+## Part 2 — Candidate side
+
+Candidates get their own portal on the same pipeline and the same scoring engine —
+nothing is scored two different ways. Built one phase at a time; status in
+[PROGRESS.md](PROGRESS.md).
+
+### C1 — Candidate accounts & sign-in
+- **Two sign-in tickets.** A 15-minute signed access token (a JWT, sent as
+  `Authorization: Bearer …`, kept only in the page's memory) and a 7-day refresh
+  ticket in an httpOnly, SameSite=Strict cookie that only `/api/auth/*` ever sees —
+  the database stores just its SHA-256. Every refresh replaces the ticket; a ticket
+  that comes back after being replaced signs the account out everywhere.
+- **Roles: CANDIDATE, RECRUITER, ADMIN.** Every endpoint not listed as public is
+  recruiter-only by default, so the dashboard now has a sign-in page (the demo
+  recruiter is created from `.env`). The Part 1 apply flow stays public: applicants
+  never need an account, and `seed.sh` works unchanged.
+- **E-mail verification** with a one-time link (24 h). **Mailpit** catches every
+  mail locally — nothing leaves the laptop.
+- **Account claim.** Once the e-mail is verified, every earlier application sent
+  with it is linked to the account (and again at each sign-in); before verification
+  nothing is linked, because anyone can type any address into a form.
+- **Isolation.** A candidate reads only their own applications — someone else's
+  answers 403, tested through the real security filter chain. Statuses are
+  candidate-facing: a fraud flag reads "In review" (no tip-off), a rejection reads
+  "Not selected".
+- **Per-IP limits:** sign-in 10/min, sign-up 5/10 min, resend 3/10 min → 429 with
+  `Retry-After`.
+- **Candidate portal** (`/candidate`): sign-up, sign-in, the verify page, and a
+  dashboard listing the claimed applications; works at phone width.
