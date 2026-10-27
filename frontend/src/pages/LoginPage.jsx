@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Rocket, LogIn } from 'lucide-react'
 import { login } from '../auth'
 
@@ -60,6 +61,9 @@ export default function LoginPage() {
           Demo recruiter: the email and password are <code className="text-cyan">RECRUITER_EMAIL</code> and{' '}
           <code className="text-cyan">RECRUITER_PASSWORD</code> in your <code className="text-cyan">.env</code>.
         </p>
+        <Link to="/candidate/login" className="block text-center text-xs text-cyan hover:underline">
+          Looking for a job? Candidate sign-in →
+        </Link>
       </form>
     </div>
   )

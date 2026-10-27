@@ -25,17 +25,46 @@ export function useSession() {
   return state
 }
 
-export async function login(email, password) {
-  const res = await fetch('/api/auth/login', {
+// POST to /api/auth/* and surface the server's own message ("wrong email or password",
+// "too many attempts — try again in 48 s") instead of a bare HTTP status
+async function postAuth(path, body) {
+  const res = await fetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify(body),
   })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.message || `request failed (HTTP ${res.status})`)
+  return data
+}
+
+export async function login(email, password) {
+  setSession(await postAuth('/api/auth/login', { email, password }))
+}
+
+/** A new candidate account — signed in at once; the verify link goes to the inbox (Mailpit here). */
+export async function signup(email, password) {
+  setSession(await postAuth('/api/auth/signup', { email, password }))
+}
+
+/**
+ * The link from the e-mail; works signed in or out. When the person who opened it is the one signed
+ * in, the session is refreshed so it shows "verified". mine = the signed-in user is that account.
+ */
+export async function verifyEmail(token) {
+  const user = await postAuth('/api/auth/verify-email', { token })
+  const mine = session.status === 'signed-in' && session.user.id === user.id
+  if (mine) await refreshSession()
+  return { user, mine }
+}
+
+/** A fresh verify link for the signed-in user (rate-limited by the API). */
+export async function resendVerification() {
+  const res = await authFetch('/api/auth/resend-verification', { method: 'POST' })
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(body.message || `sign-in failed (HTTP ${res.status})`)
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.message || `request failed (HTTP ${res.status})`)
   }
-  setSession(await res.json())
 }
 
 export async function logout() {

@@ -62,4 +62,6 @@ export const api = {
   },
   stats: (jobId) => request(`/api/stats/pipeline${jobId ? `?jobId=${jobId}` : ''}`),
   lag: () => request('/api/admin/lag'),
+  // Part 2 candidate portal: the signed-in candidate's own (claimed) applications
+  myApplications: () => request('/api/candidate/applications'),
 }

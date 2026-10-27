@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import Dashboard from './pages/Dashboard'
@@ -11,27 +11,22 @@ import ReviewQueuePage from './pages/ReviewQueuePage'
 import SearchPage from './pages/SearchPage'
 import UploadPage from './pages/UploadPage'
 import LoginPage from './pages/LoginPage'
-import { logout, refreshSession, useSession } from './auth'
+import CandidateApp from './candidate/CandidateApp'
+import { refreshSession, useSession } from './auth'
 
 export default function App() {
   const session = useSession()
+  const { pathname } = useLocation()
   // a reload or a new tab starts with no token in memory — the refresh cookie brings the session back
   useEffect(() => { refreshSession() }, [])
 
   if (session.status === 'checking') {
     return <div className="flex min-h-screen items-center justify-center text-sm text-dim">Checking your session…</div>
   }
+  // the candidate portal has its own pages, signed in or not ("/candidates" is the recruiter's list)
+  if (pathname === '/candidate' || pathname.startsWith('/candidate/')) return <CandidateApp />
   if (session.status === 'signed-out') return <LoginPage />
-  if (session.user.role === 'CANDIDATE') {
-    return (
-      <div className="flex min-h-screen items-center justify-center px-4">
-        <div className="card card-strong max-w-sm space-y-3 p-6 text-center !rounded-2xl">
-          <p className="text-sm">This is the recruiter console. Candidate accounts get their own portal.</p>
-          <button onClick={logout} className="text-sm text-cyan hover:underline">Sign out</button>
-        </div>
-      </div>
-    )
-  }
+  if (session.user.role === 'CANDIDATE') return <Navigate to="/candidate" replace />
 
   return (
     <div className="min-h-screen">
