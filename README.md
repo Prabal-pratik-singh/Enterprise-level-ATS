@@ -275,3 +275,18 @@ nothing is scored two different ways. Built one phase at a time; status in
   `Retry-After`.
 - **Candidate portal** (`/candidate`): sign-up, sign-in, the verify page, and a
   dashboard listing the claimed applications; works at phone width.
+
+### C2 — Master profile & profile resume
+- **A resume for the candidate, not for a job.** It is uploaded to `profiles/{account}/v{n}/`
+  with the same checks as an application resume and read by the **same parser and extractor**,
+  on topics of its own (`profile.resume.uploaded` → `profile.resume.parsed` → `profile.changed`
+  → `profile.embedded`) — so the application-only services (matcher, fraud, dedup, indexer)
+  never see it. Every event now says what it is about: `subject_type` APPLICATION or PROFILE.
+- **One profile per account,** rebuilt from each new version; a failed upload never wipes a
+  good profile, and an older version's late answer never replaces a newer one.
+- **Your fixes survive re-uploads.** Add or remove a skill, correct a job's dates (keyed by
+  company + title, so a re-parse that reorders jobs keeps them); experience months, seniority
+  and completeness are recomputed. One shared function builds this effective profile for the
+  page, the search vector and the next phases.
+- **Live status:** the "My Resume" page follows Uploaded → Read → Profile built → Searchable
+  over SSE, per account, without polling.
