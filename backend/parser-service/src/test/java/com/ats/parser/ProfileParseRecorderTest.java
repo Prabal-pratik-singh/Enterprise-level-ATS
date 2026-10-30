@@ -17,6 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -75,6 +76,9 @@ class ProfileParseRecorderTest {
 
         assertThat(v1.getStatus()).isEqualTo("PARSE_FAILED");
         assertThat(v1.getError()).startsWith("We couldn't read this file");
-        verify(outbox, never()).appendForSubject(anyString(), anyString(), any(), anyMap());   // the pipeline ends here
+        // the pipeline ends here: nothing for the extractor, only a notice so an open page updates live
+        verify(outbox, never()).appendForSubject(eq(Topics.PROFILE_RESUME_PARSED), anyString(), any(), anyMap());
+        verify(outbox).appendForSubject(eq(Topics.PROFILE_CHANGED), eq(EventEnvelope.PROFILE), eq(sneha),
+                argThat(data -> "parse_failed".equals(data.get("reason"))));
     }
 }

@@ -62,7 +62,10 @@ public class ProfileExtractRecorder {
                 "completeness", result.completeness()));
     }
 
-    /** DLQ bookkeeping: the page shows a sentence the candidate can act on. */
+    /**
+     * DLQ bookkeeping: the page shows a sentence the candidate can act on. profile.changed (reason
+     * extract_failed) lets an open page update live — the embedder ignores it.
+     */
     @Transactional
     public void recordFailure(EventEnvelope event) {
         if (!processed.markProcessed(event.eventId(), "extractor-profile-dlq")) {
@@ -71,6 +74,10 @@ public class ProfileExtractRecorder {
         ProfileResume resume = resumeOf(event);
         resume.markFailed("EXTRACT_FAILED", EXTRACT_FAILED_MESSAGE);
         resumes.save(resume);
+        outbox.appendForSubject(Topics.PROFILE_CHANGED, EventEnvelope.PROFILE, resume.getUserId(), Map.of(
+                "reason", "extract_failed",
+                "profile_resume_id", resume.getId().toString(),
+                "version", resume.getVersion()));
     }
 
     private ProfileResume resumeOf(EventEnvelope event) {

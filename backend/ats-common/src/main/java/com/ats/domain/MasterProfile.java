@@ -61,6 +61,13 @@ public class MasterProfile {
         this.updatedAt = Instant.now();
     }
 
+    /** The candidate's own fixes (replaced as a whole), and the completeness they lead to. */
+    public void replaceOverrides(String overridesJson, double effectiveCompleteness) {
+        this.profileOverrides = overridesJson;
+        this.completeness = effectiveCompleteness;
+        this.updatedAt = Instant.now();
+    }
+
     public UUID getUserId() {
         return userId;
     }

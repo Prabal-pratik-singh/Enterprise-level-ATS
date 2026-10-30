@@ -7,9 +7,10 @@ import com.ats.auth.SecurityConfig;
 import com.ats.auth.TokenService;
 import com.ats.auth.UserAccount;
 import com.ats.auth.UserAccountRepository;
-import com.ats.domain.MasterProfileRepository;
 import com.ats.domain.ProfileResumeRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -17,10 +18,14 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -41,7 +46,11 @@ class ProfileControllerTest {
     @MockitoBean
     private ProfileResumeRepository resumes;
     @MockitoBean
-    private MasterProfileRepository profiles;
+    private ProfileViews views;
+    @MockitoBean
+    private ProfileOverridesService overrides;
+    @MockitoBean
+    private ProfileSseHub hub;
     @MockitoBean
     private UserAccountRepository users;
     @MockitoBean
@@ -69,6 +78,9 @@ class ProfileControllerTest {
 
     @Test
     void aNewAccountHasAnEmptyProfile() throws Exception {
+        when(views.viewOf(sneha.getId())).thenReturn(new ProfileViews.ProfileView(null, null,
+                new ObjectMapper().createObjectNode(), null, false, null));
+
         mvc.perform(get("/api/candidate/profile").header("Authorization", bearer(sneha)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.latestResume").value(nullValue()))
@@ -77,9 +89,23 @@ class ProfileControllerTest {
     }
 
     @Test
+    void herFixesAreSavedForHerAccount() throws Exception {
+        mvc.perform(put("/api/candidate/profile/overrides").header("Authorization", bearer(sneha))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"skills_added\":[\"kafka\"],\"skills_removed\":[\"html\"]}"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<ProfileOverridesService.Overrides> saved = ArgumentCaptor.forClass(ProfileOverridesService.Overrides.class);
+        verify(overrides).save(eq(sneha.getId()), saved.capture());
+        assertThat(saved.getValue().skillsAdded()).containsExactly("kafka");
+        assertThat(saved.getValue().skillsRemoved()).containsExactly("html");
+    }
+
+    @Test
     void recruitersAndAnonymousCallersCannotUseIt() throws Exception {
         mvc.perform(get("/api/candidate/profile").header("Authorization", bearer(recruiter)))
                 .andExpect(status().isForbidden());
         mvc.perform(get("/api/candidate/profile/resumes")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/candidate/profile/events")).andExpect(status().isUnauthorized());
     }
 }

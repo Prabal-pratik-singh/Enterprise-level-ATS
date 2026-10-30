@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -118,5 +119,7 @@ class ProfileExtractRecorderTest {
         assertThat(v1.getStatus()).isEqualTo("EXTRACT_FAILED");
         assertThat(v1.getError()).startsWith("We couldn't turn your resume into a profile");
         verify(profiles, never()).save(any());
+        verify(outbox).appendForSubject(eq(Topics.PROFILE_CHANGED), eq(EventEnvelope.PROFILE), eq(sneha),
+                argThat(data -> "extract_failed".equals(data.get("reason"))));   // an open page updates live
     }
 }

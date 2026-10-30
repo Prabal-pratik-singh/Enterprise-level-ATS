@@ -48,7 +48,10 @@ public class ProfileParseRecorder {
                 "text_chars", doc.text().length()));
     }
 
-    /** DLQ bookkeeping: the pipeline ends here for this version; the page shows the plain message. */
+    /**
+     * DLQ bookkeeping: the pipeline ends here for this version; the page shows the plain message.
+     * profile.changed (reason parse_failed) lets an open page update live — the embedder ignores it.
+     */
     @Transactional
     public void recordFailure(EventEnvelope event) {
         if (!processed.markProcessed(event.eventId(), "parser-profile-dlq")) {
@@ -58,5 +61,9 @@ public class ProfileParseRecorder {
                 .orElseThrow(() -> new IllegalStateException("profile resume not found for a failed parse"));
         resume.markFailed("PARSE_FAILED", PARSE_FAILED_MESSAGE);
         resumes.save(resume);
+        outbox.appendForSubject(Topics.PROFILE_CHANGED, EventEnvelope.PROFILE, resume.getUserId(), Map.of(
+                "reason", "parse_failed",
+                "profile_resume_id", resume.getId().toString(),
+                "version", resume.getVersion()));
     }
 }
