@@ -64,4 +64,27 @@ export const api = {
   lag: () => request('/api/admin/lag'),
   // Part 2 candidate portal: the signed-in candidate's own (claimed) applications
   myApplications: () => request('/api/candidate/applications'),
+  // Part 2 C2: the candidate's own profile (errors carry the server's sentence — the editor shows it)
+  myProfile: () => requestExplained('/api/candidate/profile'),
+  profileVersions: () => requestExplained('/api/candidate/profile/resumes'),
+  profileUploadUrl: (filename) => requestExplained('/api/candidate/profile/resume/upload-url',
+    { method: 'POST', body: JSON.stringify({ filename }) }),
+  completeProfileUpload: (key) => requestExplained('/api/candidate/profile/resume/complete',
+    { method: 'POST', body: JSON.stringify({ key }) }),
+  saveProfileOverrides: (overrides) => requestExplained('/api/candidate/profile/overrides',
+    { method: 'PUT', body: JSON.stringify(overrides) }),
+}
+
+// Like request(), but a failure carries the server's own sentence ("start_date must not be after
+// end_date") instead of a bare HTTP status — for pages where the person can act on it.
+async function requestExplained(path, options = {}) {
+  const res = await authFetch(path, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', ...options.headers },
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.message || `${options.method || 'GET'} ${path} → HTTP ${res.status}`)
+  }
+  return res.status === 204 ? null : res.json()
 }

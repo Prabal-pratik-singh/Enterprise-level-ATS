@@ -5,6 +5,7 @@ import { api } from '../api'
 import StatusChip from '../components/StatusChip'
 import { explainFailure } from '../lib/failures'
 import { pts } from '../lib/fraud'
+import { putWithProgress } from '../lib/upload'
 
 /**
  * Bulk upload: drop many resumes for one job. Each file gets a placeholder candidate
@@ -19,19 +20,6 @@ const PARALLEL = 3                            // uploads at once — gentle on t
 const DONE = ['SCORED', 'FLAGGED_FOR_REVIEW', 'PARSE_FAILED', 'SHORTLISTED', 'REJECTED']
 
 const kb = (n) => (n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.ceil(n / 1024)} KB`)
-
-/** PUT the file to the presigned MinIO URL with real upload progress (fetch can't report it). */
-function putWithProgress(url, file, contentType, onProgress) {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest()
-    xhr.open('PUT', url)
-    xhr.setRequestHeader('Content-Type', contentType) // must match what the link was signed for
-    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total)
-    xhr.onload = () => (xhr.status < 300 ? resolve() : reject(new Error(`upload failed: HTTP ${xhr.status}`)))
-    xhr.onerror = () => reject(new Error('upload failed: network error'))
-    xhr.send(file)
-  })
-}
 
 export default function UploadPage() {
   const [params, setParams] = useSearchParams()

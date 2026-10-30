@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { MailWarning, Briefcase, Send } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { MailWarning, Briefcase, Send, FileText } from 'lucide-react'
 import { api } from '../api'
 import { resendVerification } from '../auth'
 import CandidateStatus from './CandidateStatus'
@@ -24,6 +25,9 @@ export default function CandidateDashboard({ user }) {
       </div>
 
       {!user.emailVerified && <VerifyBanner email={user.email} />}
+
+      <ResumeCard />
+
 
       <section className="card p-5 !rounded-2xl">
         <div className="mb-3 flex items-center gap-2">
@@ -55,6 +59,29 @@ export default function CandidateDashboard({ user }) {
         )}
       </section>
     </div>
+  )
+}
+
+/** One line about the profile resume, with the way in — the page itself is /candidate/resume. */
+function ResumeCard() {
+  const [view, setView] = useState(undefined) // undefined = loading, null = could not load
+  useEffect(() => { api.myProfile().then(setView).catch(() => setView(null)) }, [])
+  if (view === undefined) return null
+
+  const derived = view?.profile?.derived
+  return (
+    <Link to="/candidate/resume" className="card flex flex-wrap items-center gap-3 p-4 !rounded-2xl hover:ring-1 hover:ring-cyan/40">
+      <FileText size={18} className="shrink-0 text-cyan" />
+      <div className="min-w-0 flex-1 text-sm">
+        <div className="font-medium">My resume</div>
+        <div className="text-dim">
+          {derived
+            ? `${view.profile.skills?.length ?? 0} skills · ${derived.total_experience_months} months · ${view.embedded ? 'searchable' : 'being indexed'}`
+            : view?.latestResume ? 'Being read…' : 'No resume yet — upload one to build your profile'}
+        </div>
+      </div>
+      <span className="text-sm text-cyan">Open →</span>
+    </Link>
   )
 }
 

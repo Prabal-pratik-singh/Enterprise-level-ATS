@@ -1,9 +1,10 @@
-import { Link, Navigate, Route, Routes } from 'react-router-dom'
+import { Link, Navigate, NavLink, Route, Routes } from 'react-router-dom'
 import { Rocket, LogOut } from 'lucide-react'
 import { logout, useSession } from '../auth'
 import AuthForm from './AuthForm'
 import VerifyPage from './VerifyPage'
 import CandidateDashboard from './CandidateDashboard'
+import ResumePage from './ResumePage'
 
 /** The candidate portal (/candidate/*): its own top bar instead of the recruiter sidebar, same space theme. */
 export default function CandidateApp() {
@@ -19,6 +20,7 @@ export default function CandidateApp() {
           <Route path="/candidate/signup" element={candidate ? <Navigate to="/candidate" replace /> : <AuthForm mode="signup" />} />
           <Route path="/candidate/login" element={candidate ? <Navigate to="/candidate" replace /> : <AuthForm mode="login" />} />
           <Route path="/candidate" element={home(status, user)} />
+          <Route path="/candidate/resume" element={candidate ? <ResumePage /> : home(status, user)} />
           <Route path="*" element={<Navigate to="/candidate" replace />} />
         </Routes>
       </main>
@@ -49,10 +51,21 @@ function TopBar({ candidate }) {
           <div className="text-[10px] uppercase tracking-widest text-dim">candidate portal</div>
         </div>
       </Link>
+      {candidate && (
+        <nav className="flex items-center gap-1 text-sm">
+          {[['/candidate', 'Dashboard'], ['/candidate/resume', 'My Resume']].map(([to, label]) => (
+            <NavLink key={to} to={to} end
+                     className={({ isActive }) => `rounded-lg px-2.5 py-1 transition ${isActive
+                       ? 'bg-white/10 text-ink' : 'text-dim hover:text-ink'}`}>
+              {label}
+            </NavLink>
+          ))}
+        </nav>
+      )}
       <div className="ml-auto flex min-w-0 items-center gap-3 text-sm">
         {candidate ? (
           <>
-            <span className="hidden truncate text-dim sm:inline" title={candidate.email}>{candidate.email}</span>
+            <span className="hidden truncate text-dim md:inline" title={candidate.email}>{candidate.email}</span>
             <button onClick={logout} className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-dim hover:bg-white/5 hover:text-ink">
               <LogOut size={14} /> Sign out
             </button>
