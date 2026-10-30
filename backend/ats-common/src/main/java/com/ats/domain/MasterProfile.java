@@ -50,6 +50,17 @@ public class MasterProfile {
         this.updatedAt = Instant.now();
     }
 
+    /**
+     * A newly extracted resume becomes the profile. Only the extracted part is replaced — the
+     * candidate's own fixes (profileOverrides) stay exactly as they were.
+     */
+    public void replaceExtracted(UUID resumeId, String profileJson, double completeness) {
+        this.currentResumeId = resumeId;
+        this.profile = profileJson;
+        this.completeness = completeness;
+        this.updatedAt = Instant.now();
+    }
+
     public UUID getUserId() {
         return userId;
     }

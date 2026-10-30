@@ -66,6 +66,28 @@ public class ProfileResume {
         this.updatedAt = this.createdAt;
     }
 
+    /** Parser success: the text is in parsed.json next to the file. */
+    public void markParsed(String parsedS3Key) {
+        this.parsedS3Key = parsedS3Key;
+        moveTo("PARSED", null);
+    }
+
+    /** Extractor success: the profile was read from this version. */
+    public void markExtracted() {
+        moveTo("EXTRACTED", null);
+    }
+
+    /** PARSE_FAILED or EXTRACT_FAILED, with a sentence the candidate can act on (not a stack trace). */
+    public void markFailed(String failedStatus, String plainWordsError) {
+        moveTo(failedStatus, plainWordsError);
+    }
+
+    private void moveTo(String newStatus, String newError) {
+        this.status = newStatus;
+        this.error = newError;
+        this.updatedAt = Instant.now();
+    }
+
     public UUID getId() {
         return id;
     }

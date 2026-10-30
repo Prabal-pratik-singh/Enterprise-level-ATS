@@ -11,7 +11,6 @@ import com.ats.domain.ResumeRepository;
 import com.ats.events.EventEnvelope;
 import com.ats.events.ProcessedEvents;
 import com.ats.events.Topics;
-import com.ats.util.FileTypes;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -43,22 +42,17 @@ public class ResumeUploadedConsumer {
     private final ResumeRepository resumes;
     private final S3Client s3;
     private final S3Properties s3Props;
-    private final PdfExtractor pdfExtractor;
-    private final DocxExtractor docxExtractor;
-    private final OcrEngine ocrEngine;
+    private final DocumentParser parser;
     private final ParseRecorder recorder;
 
     public ResumeUploadedConsumer(ObjectMapper mapper, ProcessedEvents processed, ResumeRepository resumes,
-                                  S3Client s3, S3Properties s3Props, PdfExtractor pdfExtractor,
-                                  DocxExtractor docxExtractor, OcrEngine ocrEngine, ParseRecorder recorder) {
+                                  S3Client s3, S3Properties s3Props, DocumentParser parser, ParseRecorder recorder) {
         this.mapper = mapper;
         this.processed = processed;
         this.resumes = resumes;
         this.s3 = s3;
         this.s3Props = s3Props;
-        this.pdfExtractor = pdfExtractor;
-        this.docxExtractor = docxExtractor;
-        this.ocrEngine = ocrEngine;
+        this.parser = parser;
         this.recorder = recorder;
     }
 
@@ -87,16 +81,7 @@ public class ResumeUploadedConsumer {
                 GetObjectRequest.builder().bucket(s3Props.bucket()).key(s3Key).build()).asByteArray();
 
         // Route by the REAL type (first bytes), not by the filename in the key
-        String type = FileTypes.detect(fileBytes);
-        ParsedDocument parsedDoc = switch (type == null ? "unknown" : type) {
-            case "pdf" -> pdfExtractor.extract(fileBytes);
-            case "docx" -> docxExtractor.extract(fileBytes);
-            case "png", "jpg" -> {
-                OcrEngine.OcrResult result = ocrEngine.ocrImage(fileBytes);
-                yield ParsedDocument.imageOcr(result.text(), result.meanConfidence());
-            }
-            default -> throw new IllegalStateException("unsupported file type: " + type);
-        };
+        ParsedDocument parsedDoc = parser.parse(fileBytes);
 
         // parsed.json lives right next to the original file:
         //   resumes/{job}/{app}/v1/resume.pdf  →  resumes/{job}/{app}/v1/parsed.json
