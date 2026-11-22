@@ -1,0 +1,822 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ATS Pipeline — Design &amp; Implementation Guide</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+  :root {
+    --ink: #1c2433; --muted: #5a6475; --line: #d9dee7; --soft: #f4f6f9;
+    --accent: #c47a12; --accent-soft: #fdf3e4; --blue: #2b5ea7; --blue-soft: #eaf1fb;
+    --green: #2f7d4f; --green-soft: #e8f5ec;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Calibri, Arial, sans-serif; color: var(--ink); background: #fff;
+         font-size: 10.2pt; line-height: 1.5; margin: 0; }
+  h1 { font-size: 22pt; margin: 0 0 4px; letter-spacing: -0.3px; }
+  h2 { font-size: 15pt; margin: 22px 0 8px; padding-bottom: 4px; border-bottom: 2px solid var(--accent);
+       break-after: avoid; }
+  h3 { font-size: 12pt; margin: 18px 0 6px; color: var(--blue); break-after: avoid; }
+  h4 { font-size: 10.4pt; margin: 10px 0 3px; break-after: avoid; }
+  p { margin: 4px 0 8px; }
+  ul, ol { margin: 4px 0 8px; padding-left: 20px; }
+  li { margin: 2px 0; }
+  code { font-family: Consolas, "Courier New", monospace; font-size: 9pt; background: var(--soft);
+         padding: 0 3px; border-radius: 3px; }
+  pre { font-family: Consolas, "Courier New", monospace; font-size: 8.8pt; background: var(--soft);
+        border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; white-space: pre-wrap;
+        break-inside: avoid; margin: 6px 0 10px; }
+  table { border-collapse: collapse; width: 100%; margin: 6px 0 12px; font-size: 9.2pt; break-inside: auto; }
+  th, td { border: 1px solid var(--line); padding: 4px 6px; text-align: left; vertical-align: top; }
+  th { background: var(--soft); }
+  tr { break-inside: avoid; }
+  .page-break { break-before: page; }
+  .cover { height: 250mm; display: flex; flex-direction: column; justify-content: center; }
+  .cover .kicker { color: var(--accent); font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; font-size: 9.5pt; }
+  .cover h1 { font-size: 30pt; margin: 8px 0 10px; }
+  .cover .sub { font-size: 13pt; color: var(--muted); max-width: 150mm; }
+  .cover .meta { margin-top: 30px; font-size: 9.5pt; color: var(--muted); border-top: 1px solid var(--line); padding-top: 10px; }
+  .feature { border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px 6px; margin: 10px 0 14px; }
+  .feature > h3 { margin-top: 2px; }
+  .tag { display: inline-block; font-size: 8pt; font-weight: 700; letter-spacing: .6px; text-transform: uppercase;
+         padding: 1px 6px; border-radius: 3px; margin-right: 6px; vertical-align: 1px; }
+  .t-logic { background: var(--blue-soft); color: var(--blue); }
+  .t-why { background: var(--accent-soft); color: var(--accent); }
+  .t-how { background: var(--green-soft); color: var(--green); }
+  .t-proof { background: var(--soft); color: var(--muted); }
+  .note { background: var(--accent-soft); border-left: 3px solid var(--accent); padding: 6px 10px; margin: 8px 0 12px;
+          break-inside: avoid; }
+  .simple { background: var(--blue-soft); border-left: 3px solid var(--blue); padding: 6px 10px; margin: 8px 0 12px;
+            break-inside: avoid; }
+  .toc ol { columns: 2; column-gap: 24px; }
+  .toc li { break-inside: avoid; }
+  .muted { color: var(--muted); }
+  .diagram { break-inside: avoid; margin: 8px 0 14px; }
+  .diagram svg { width: 100%; height: auto; }
+</style>
+</head>
+<body>
+
+<!-- ============================ COVER ============================ -->
+<section class="cover">
+  <div class="kicker">Enterprise ATS · Design &amp; Implementation Guide</div>
+  <h1>How the ATS Pipeline works, and why it was built this way</h1>
+  <div class="sub">Every feature in the project: the logic behind it, the reason for each design choice,
+    how it is implemented in the code, and how it was checked.</div>
+  <div class="meta">
+    Written 23 November 2026, from the repository's own records (README.md, PROGRESS.md, DEMO.md) and the
+    source code. Numbers are the ones measured and logged in PROGRESS.md / DEMO.md on this laptop.<br>
+    Scope: Part 1 (recruiter side, Phases 1–8) and Part 2 phases C1–C2 (candidate side).
+    Note: C2 is on branch <code>feat/candidate-profile</code>, which is not merged into <code>main</code> yet.
+  </div>
+</section>
+
+<!-- ============================ TOC ============================ -->
+<section class="page-break toc">
+  <h2>Contents</h2>
+  <ol>
+    <li>The big picture</li>
+    <li>Foundations used by every feature
+      <ol type="a">
+        <li>Microservices + a shared library</li>
+        <li>Kafka events</li>
+        <li>Transactional outbox</li>
+        <li>Idempotent consumers</li>
+        <li>Retries and dead-letter queues</li>
+        <li>Database and migrations</li>
+        <li>File storage with presigned uploads</li>
+        <li>Live updates (SSE)</li>
+      </ol>
+    </li>
+    <li>Part 1: the recruiter side
+      <ol type="a">
+        <li>Apply &amp; upload</li>
+        <li>Parser: PDF, DOCX, OCR, hidden text</li>
+        <li>Extractor: LLM to structured profile</li>
+        <li>Scoring engine</li>
+        <li>Recruiter dashboard &amp; Live Flow</li>
+        <li>Trust Service: fraud checks</li>
+        <li>Deduplication: MinHash + LSH</li>
+        <li>Embeddings &amp; hybrid search</li>
+        <li>AI rerank &amp; the fairness guard</li>
+        <li>10K load test &amp; scaling lessons</li>
+      </ol>
+    </li>
+    <li>Part 2: the candidate side
+      <ol type="a">
+        <li>C1: accounts &amp; sign-in</li>
+        <li>C2: master profile &amp; profile resume</li>
+      </ol>
+    </li>
+    <li>Decision summary table</li>
+    <li>Bugs found and lessons learned</li>
+    <li>From this laptop to 500K applicants</li>
+    <li>What comes next</li>
+  </ol>
+  <div class="simple"><b>How to read each feature.</b> Every feature box has four parts:
+    <span class="tag t-logic">Logic</span>what it does, step by step;
+    <span class="tag t-why">Why</span>why this approach and not another;
+    <span class="tag t-how">How</span>where it lives in the code;
+    <span class="tag t-proof">Checked</span>how it was proven to work.</div>
+</section>
+
+<!-- ============================ 1. BIG PICTURE ============================ -->
+<section class="page-break">
+  <h2>1. The big picture</h2>
+  <p>This is an <b>Applicant Tracking System (ATS)</b>: a tool companies use to receive job applications, read
+    resumes, rank candidates and decide who to interview. It is designed like a system that must screen
+    <b>500,000 applicants for one job</b>, but it runs on one laptop with Docker Compose.</p>
+  <div class="simple"><b>In one sentence:</b> a resume is uploaded, then passed from one small service to the
+    next through Kafka messages. Each service does one job (read the file, understand it, score it, check it for
+    fraud, make it searchable) and writes its result to the database.</div>
+
+  <div class="diagram">
+  <svg viewBox="0 0 760 330" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial" font-size="12">
+    <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5a6475"/></marker></defs>
+    <g stroke="#5a6475" stroke-width="1.4" fill="none" marker-end="url(#a)">
+      <path d="M118,60 H158"/><path d="M278,60 H318"/><path d="M438,60 H478"/>
+      <path d="M538,82 V110 H90 V140"/><path d="M538,110 V140" /><path d="M538,110 H700 V140"/>
+      <path d="M538,110 H320 V140"/>
+      <path d="M320,186 V226"/><path d="M90,186 V230 H200 V246" /><path d="M538,186 V230 H440 V246"/>
+      <path d="M700,186 V246"/>
+    </g>
+    <g font-size="10" fill="#5a6475">
+      <text x="122" y="52">uploaded</text><text x="284" y="52">parsed</text><text x="442" y="52">extracted</text>
+      <text x="326" y="212">embedded</text>
+    </g>
+    <g>
+      <rect x="10" y="38" width="108" height="44" rx="6" fill="#eaf1fb" stroke="#2b5ea7"/>
+      <text x="64" y="58" text-anchor="middle" font-weight="600">api-service</text>
+      <text x="64" y="73" text-anchor="middle" font-size="10" fill="#5a6475">apply, upload, UI API</text>
+      <rect x="160" y="38" width="118" height="44" rx="6" fill="#fff" stroke="#5a6475"/>
+      <text x="219" y="58" text-anchor="middle" font-weight="600">parser</text>
+      <text x="219" y="73" text-anchor="middle" font-size="10" fill="#5a6475">PDF / DOCX / OCR</text>
+      <rect x="320" y="38" width="118" height="44" rx="6" fill="#fff" stroke="#5a6475"/>
+      <text x="379" y="58" text-anchor="middle" font-weight="600">extractor</text>
+      <text x="379" y="73" text-anchor="middle" font-size="10" fill="#5a6475">LLM → profile JSON</text>
+      <rect x="480" y="38" width="118" height="44" rx="6" fill="#fdf3e4" stroke="#c47a12"/>
+      <text x="539" y="58" text-anchor="middle" font-weight="600">fan-out</text>
+      <text x="539" y="73" text-anchor="middle" font-size="10" fill="#5a6475">4 readers in parallel</text>
+
+      <rect x="30" y="142" width="120" height="44" rx="6" fill="#fff" stroke="#5a6475"/>
+      <text x="90" y="162" text-anchor="middle" font-weight="600">matcher</text>
+      <text x="90" y="177" text-anchor="middle" font-size="10" fill="#5a6475">match_score</text>
+      <rect x="260" y="142" width="120" height="44" rx="6" fill="#fff" stroke="#5a6475"/>
+      <text x="320" y="162" text-anchor="middle" font-weight="600">embedder</text>
+      <text x="320" y="177" text-anchor="middle" font-size="10" fill="#5a6475">768-number vector</text>
+      <rect x="478" y="142" width="120" height="44" rx="6" fill="#fff" stroke="#5a6475"/>
+      <text x="538" y="162" text-anchor="middle" font-weight="600">fraud (Trust)</text>
+      <text x="538" y="177" text-anchor="middle" font-size="10" fill="#5a6475">fraud_penalty</text>
+      <rect x="640" y="142" width="120" height="44" rx="6" fill="#fff" stroke="#5a6475"/>
+      <text x="700" y="162" text-anchor="middle" font-weight="600">dedup</text>
+      <text x="700" y="177" text-anchor="middle" font-size="10" fill="#5a6475">MinHash + LSH</text>
+
+      <rect x="140" y="248" width="360" height="44" rx="6" fill="#e8f5ec" stroke="#2f7d4f"/>
+      <text x="320" y="268" text-anchor="middle" font-weight="600">indexer → OpenSearch (search copy)</text>
+      <text x="320" y="283" text-anchor="middle" font-size="10" fill="#5a6475">re-reads Postgres on every change</text>
+      <rect x="560" y="248" width="190" height="44" rx="6" fill="#f4f6f9" stroke="#5a6475"/>
+      <text x="655" y="268" text-anchor="middle" font-weight="600">Postgres</text>
+      <text x="655" y="283" text-anchor="middle" font-size="10" fill="#5a6475">final_score = match − penalty ± rerank</text>
+    </g>
+    <text x="10" y="320" font-size="10" fill="#5a6475">Every arrow is a Kafka topic written through the transactional outbox. Services never call each other directly. dedup findings feed back into fraud.</text>
+  </svg>
+  </div>
+
+  <h3>The services</h3>
+  <table>
+    <tr><th>Service</th><th>Job</th><th>Reads topic</th><th>Writes topic</th></tr>
+    <tr><td><code>api-service</code></td><td>Public apply flow, recruiter &amp; candidate REST API, sign-in, search, rerank, live updates</td><td><code>application.scored</code> (for SSE), profile events</td><td><code>application.created</code>, <code>resume.uploaded</code></td></tr>
+    <tr><td><code>parser-service</code></td><td>File bytes → clean text (+ hidden-text fingerprint)</td><td><code>resume.uploaded</code></td><td><code>resume.parsed</code></td></tr>
+    <tr><td><code>extractor-service</code></td><td>Text → structured profile JSON (LLM, or rules for load tests)</td><td><code>resume.parsed</code></td><td><code>resume.extracted</code></td></tr>
+    <tr><td><code>matcher-service</code></td><td>Explainable score against the job</td><td><code>resume.extracted</code></td><td><code>application.scored</code></td></tr>
+    <tr><td><code>fraud-service</code></td><td>"Trust Service": fraud signals → penalty + review queue</td><td><code>resume.extracted</code>, <code>application.deduped</code></td><td><code>application.flagged</code></td></tr>
+    <tr><td><code>dedup-service</code></td><td>Same person / same file / copied work history</td><td><code>resume.extracted</code></td><td><code>application.deduped</code></td></tr>
+    <tr><td><code>embedder-service</code></td><td>Profile → 768-number meaning vector</td><td><code>resume.extracted</code>, <code>profile.changed</code></td><td><code>resume.embedded</code>, <code>profile.embedded</code></td></tr>
+    <tr><td><code>indexer-service</code></td><td>Keeps the OpenSearch search copy up to date</td><td>scored / embedded / flagged / shortlist events</td><td>—</td></tr>
+  </table>
+
+  <h3>Technology stack (and why each piece)</h3>
+  <table>
+    <tr><th>Piece</th><th>Used for</th><th>Why this one</th></tr>
+    <tr><td>Java 21, Spring Boot 3.5</td><td>All 8 services</td><td>Mature Kafka, JPA, security and scheduling support; one language for everything.</td></tr>
+    <tr><td>Apache Kafka (KRaft, 12 partitions per topic)</td><td>Messages between services</td><td>Durable queue that keeps events, supports many consumers per topic and lets us add workers (<code>--scale parser=8</code>).</td></tr>
+    <tr><td>PostgreSQL + pgvector</td><td>All business data, vectors</td><td>One reliable database; pgvector stores embeddings next to the profile.</td></tr>
+    <tr><td>MinIO</td><td>Resume files</td><td>S3-compatible, so moving to AWS S3 is only a configuration change.</td></tr>
+    <tr><td>OpenSearch</td><td>Keyword + meaning search</td><td>BM25 keyword search and kNN vector search in one engine.</td></tr>
+    <tr><td>Groq / Ollama / Gemini</td><td>Reading resumes, rerank, embeddings</td><td>Pluggable providers: free cloud models for speed, local Ollama for zero-cost and offline.</td></tr>
+    <tr><td>React + Vite + Tailwind, nginx</td><td>Recruiter console and candidate portal</td><td>Fast build, simple styling; nginx proxies <code>/api</code> so there is no CORS setup.</td></tr>
+    <tr><td>Mailpit</td><td>Catches every e-mail</td><td>Verification e-mails can be tested without a real mail server; nothing leaves the laptop.</td></tr>
+    <tr><td>Flyway</td><td>Database schema (V1–V12)</td><td>Versioned SQL scripts; any service can start first and migrate safely.</td></tr>
+  </table>
+</section>
+
+<!-- ============================ 2. FOUNDATIONS ============================ -->
+<section class="page-break">
+  <h2>2. Foundations used by every feature</h2>
+  <p>These are the building blocks that every feature relies on. Understanding them first makes the rest easy.</p>
+
+  <div class="feature">
+    <h3>2a. Microservices + a shared library (<code>ats-common</code>)</h3>
+    <p><span class="tag t-logic">Logic</span>The backend is a Maven "reactor" (one parent project with many
+      modules). <code>ats-common</code> holds what everyone shares: database entities, the list of Kafka topics
+      (<code>Topics</code>), the event format (<code>EventEnvelope</code>), the outbox, Flyway migrations, the LLM
+      and embedding clients, the skill taxonomy. Each of the 8 services is its own Spring Boot app with its own
+      Docker image.</p>
+    <p><span class="tag t-why">Why</span>The original plan was one application with an <code>APP_ROLE</code>
+      switch. On 14 Aug 2026 it was converted, at the user's request, to real microservices so that each stage can be
+      built, deployed and scaled on its own. A shared library avoids copying the same contract code eight times.
+      <b>Honest compromise:</b> all services share one Postgres database. Giving each service its own data is the
+      named next step for production.</p>
+    <p><span class="tag t-how">How</span><code>backend/pom.xml</code> lists the modules; each Dockerfile builds
+      with <code>mvn -pl &lt;service&gt; -am</code>. Every service's <code>main</code> class is in package
+      <code>com.ats</code> so Spring finds the shared beans automatically.</p>
+    <div class="note"><b>Trap learned:</b> adding a new module means adding a <code>COPY &lt;module&gt;/pom.xml</code>
+      line to <i>every</i> Dockerfile, because the parent pom lists all modules and the build fails if one is missing.</div>
+  </div>
+
+  <div class="feature">
+    <h3>2b. Kafka events</h3>
+    <p><span class="tag t-logic">Logic</span>Every step publishes an event like <code>resume.parsed</code>. The next
+      service listens to that topic. An event carries ids and storage keys only, never the file itself. The envelope
+      is <code>{event_id, event_type, occurred_at, application_id, job_id, data, schema_version}</code>, and since C2
+      also <code>subject_type</code> (APPLICATION or PROFILE) + <code>subject_id</code>.</p>
+    <p><span class="tag t-why">Why</span>If the parser is slow, the uploads still succeed: messages simply wait in
+      the queue. The waiting count ("consumer lag") is an honest measure of load, and you scale by adding more
+      consumers. A topic has 12 partitions, so up to 12 instances of one service can share the work. Each topic
+      also has a <code>.dlq</code> twin (see 2e). Automatic topic creation is turned off so a typo cannot create a
+      1-partition topic by accident.</p>
+    <p><span class="tag t-how">How</span><code>Topics</code> + <code>KafkaTopicConfig</code> create all topics at
+      start-up with 12 partitions. Messages are keyed by the application id (or account id for profiles), so all
+      events for one application stay in order. Retention was raised to 720 hours after the default 7 days silently
+      deleted old events during a long pause.</p>
+  </div>
+
+  <div class="feature">
+    <h3>2c. Transactional outbox</h3>
+    <p><span class="tag t-logic">Logic</span>A service never sends to Kafka directly. It writes the business change
+      (e.g. "status = PARSED") <i>and</i> the event row into an <code>outbox</code> table in the <b>same database
+      transaction</b>. A background "relay" reads unsent outbox rows every 500 ms (200 at a time) and publishes them
+      to Kafka.</p>
+    <p><span class="tag t-why">Why</span>Without it there are two separate writes (database and Kafka). If the
+      service crashes between them, either the event is lost or an event is sent for a change that never happened.
+      With the outbox both succeed or both fail together. The relay may send a message twice after a crash
+      ("at least once"), which is fine because consumers are idempotent (2d).</p>
+    <p><span class="tag t-how">How</span><code>OutboxPublisher</code> (writes the row) and <code>OutboxRelay</code>
+      (<code>@Scheduled(fixedDelay = 500)</code>, <code>BATCH = 200</code>, <code>SELECT … FOR UPDATE SKIP LOCKED</code>).
+      <code>SKIP LOCKED</code> lets many relays run at once without two of them picking the same row.
+      Production alternative: Debezium change-data-capture (no polling).</p>
+  </div>
+
+  <div class="feature">
+    <h3>2d. Idempotent consumers (<code>processed_events</code>)</h3>
+    <p><span class="tag t-logic">Logic</span>Before handling an event, a consumer checks the
+      <code>processed_events</code> table for (consumer name, event id). If it is there, the event is skipped. If not,
+      the work and the "processed" row are saved in one transaction.</p>
+    <p><span class="tag t-why">Why</span>Kafka and the outbox can both deliver the same message twice. Doing the work
+      twice could, for example, double a penalty. The ledger makes a repeat harmless. It also makes "replay" safe:
+      you can rewind a consumer to the start and it only redoes what you deleted from the ledger. This is how
+      everyone was re-scored after the fairness fix (section 3i), without editing any score by hand.</p>
+    <p><span class="tag t-how">How</span><code>ProcessedEvents</code> in <code>ats-common</code>. The indexer is the
+      one exception: it always re-reads the current state from Postgres, so a duplicate just writes the same
+      document again.</p>
+  </div>
+
+  <div class="feature">
+    <h3>2e. Retries and dead-letter queues (DLQ)</h3>
+    <p><span class="tag t-logic">Logic</span>If handling fails, Kafka retries it (several tries with a back-off). If it
+      still fails, the message goes to <code>&lt;topic&gt;.dlq</code> with the error in its headers. A DLQ listener
+      then marks the application with a clear status, e.g. <code>PARSE_FAILED</code>, and records the reason in the
+      audit trail.</p>
+    <p><span class="tag t-why">Why</span>One broken file must never block the queue for everyone behind it, and it
+      must not disappear silently either. The seeder plants one corrupt PDF on purpose (valid <code>%PDF</code> magic
+      bytes, broken body) to prove this path works: exactly one DLQ message per 20 seeded resumes.</p>
+    <p><span class="tag t-how">How</span>Each worker has a <code>…DlqConsumer</code> (e.g.
+      <code>ResumeUploadedDlqConsumer</code>). Matcher, fraud and dedup share <code>resume.extracted.dlq</code>, so
+      each DLQ listener filters on the original consumer group header.</p>
+  </div>
+
+  <div class="feature">
+    <h3>2f. Database and migrations</h3>
+    <p><span class="tag t-logic">Logic</span>Flyway runs SQL migrations V1 to V12 at start-up (V12 is on the C2 branch).
+      Hibernate never changes the schema (<code>ddl-auto=none</code>).</p>
+    <p><span class="tag t-why">Why</span>The schema is versioned in git, repeatable on any machine, and Flyway's lock
+      lets several services start at the same time safely.</p>
+    <p><span class="tag t-how">How</span>Key design: the <code>scores</code> row is written by three services, each
+      owning its own column: matcher → <code>match_score</code>, fraud → <code>fraud_penalty</code>, rerank →
+      <code>rerank_adjustment</code>. Postgres computes <code>final_score</code> as a <b>generated column</b>, and the JPA
+      entity <code>Score</code> is <code>@DynamicUpdate</code> (it only writes the columns that changed). So the three
+      services can write in any order without overwriting each other (V5).</p>
+    <table>
+      <tr><th>Migration</th><th>What it adds</th></tr>
+      <tr><td>V1</td><td>Core schema: 9 tables incl. <code>outbox</code>, <code>processed_events</code>, <code>candidate_profiles.embedding vector(768)</code></td></tr>
+      <tr><td>V2, V4</td><td>Seed jobs: "Backend Engineer — Java/Kafka" and a fresher-friendly job (fixed UUIDs)</td></tr>
+      <tr><td>V3</td><td><code>unmatched_skills</code> (taxonomy to-do list)</td></tr>
+      <tr><td>V5</td><td>Split score ownership + generated <code>final_score</code></td></tr>
+      <tr><td>V6, V7</td><td>Dedup tables; candidate identity source</td></tr>
+      <tr><td>V8</td><td><code>load_test</code> flag on applications</td></tr>
+      <tr><td>V9</td><td>Rerank results + the ±10% CHECK constraint</td></tr>
+      <tr><td>V10, V11</td><td>Users, refresh tokens; e-mail verification links</td></tr>
+      <tr><td>V12</td><td><code>profile_resumes</code>, <code>candidate_master_profiles</code> (C2)</td></tr>
+    </table>
+  </div>
+
+  <div class="feature">
+    <h3>2g. File storage with presigned uploads</h3>
+    <p><span class="tag t-logic">Logic</span>The API gives the browser a short-lived (10-minute) signed URL. The
+      browser uploads the file <b>straight to MinIO</b>. Then it calls <code>/complete</code>, and the API checks the
+      file (size ≤ 10 MB, "magic bytes" say it is really a PDF/DOCX/PNG/JPG, computes SHA-256) before recording it
+      and emitting <code>resume.uploaded</code>.</p>
+    <p><span class="tag t-why">Why</span>Resume bytes never pass through the API, so the API stays light even with
+      thousands of uploads. Checking magic bytes (not the file name) stops a renamed <code>.exe</code>. The SHA-256 is
+      reused later to catch the same file uploaded under another name.</p>
+    <p><span class="tag t-how">How</span><code>UploadedFiles</code> (shared by application and profile uploads),
+      <code>FileTypes</code>, <code>S3Config</code>. The URL is signed for <code>S3_PUBLIC_ENDPOINT</code>
+      (<code>localhost:9000</code>) because the signature includes the host name the browser actually uses.
+      <code>/complete</code> is idempotent: calling it twice returns the same row, and keys outside the
+      application's own folder are refused.</p>
+  </div>
+
+  <div class="feature">
+    <h3>2h. Live updates (Server-Sent Events)</h3>
+    <p><span class="tag t-logic">Logic</span>The API listens to <code>application.scored</code> and pushes each new
+      score to every open dashboard over SSE (a long-lived HTTP response). A heartbeat every 25 s keeps the
+      connection open.</p>
+    <p><span class="tag t-why">Why</span>New candidates appear in the table without refreshing or polling. SSE is
+      simpler than WebSockets because data only flows server → browser. The UI reads SSE with <code>fetch</code>, not
+      <code>EventSource</code>, because <code>EventSource</code> cannot send the sign-in token header, and tokens
+      must not go into URLs (they would end up in nginx logs).</p>
+    <p><span class="tag t-how">How</span><code>ScoredEventsListener</code> → <code>SseHub</code>
+      (consumer group <code>api-sse</code>, latest offsets, no ledger because a duplicate push is harmless). nginx is
+      configured not to buffer the stream. C2 adds <code>ProfileSseHub</code>, grouped per account.</p>
+  </div>
+</section>
+
+<!-- ============================ 3. PART 1 ============================ -->
+<section class="page-break">
+  <h2>3. Part 1: the recruiter side</h2>
+
+  <div class="feature">
+    <h3>3a. Apply &amp; upload (Phase 2)</h3>
+    <p><span class="tag t-logic">Logic</span>Four public calls: create a candidate
+      (<code>POST /api/candidates</code>), apply to a job (<code>POST /api/jobs/{id}/applications</code>, status
+      APPLIED + <code>application.created</code>), get an upload URL, then <code>complete</code> the upload.</p>
+    <p><span class="tag t-why">Why</span>Applicants should never need an account to apply. Keeping the apply flow
+      public also lets <code>tools/seed.sh</code> drive the real API end to end.</p>
+    <p><span class="tag t-how">How</span><code>IntakeController</code>, <code>ApplicationController</code>,
+      <code>ResumeController</code>/<code>ResumeService</code>. Files go to
+      <code>resumes/{jobId}/{appId}/v{n}/resume.{ext}</code>. The synthetic resume generator
+      (<code>tools/generate_resumes.py</code>) runs in a throwaway <code>python:3.12-slim</code> container (there is no
+      host Python). At N ≥ 10 it plants 1 corrupt file and fraud cases; about 18% of resumes are image-only to
+      exercise OCR. <code>SEED=42</code> reproduces a batch exactly.</p>
+    <p><span class="tag t-proof">Checked</span>Seed 20 → 20 APPLIED, 20 MinIO objects, 20 <code>resume.uploaded</code>,
+      outbox 40/40 published.</p>
+  </div>
+
+  <div class="feature">
+    <h3>3b. Parser: PDF, DOCX, OCR and hidden text (Phase 3)</h3>
+    <p><span class="tag t-logic">Logic</span></p>
+    <ol>
+      <li>Download the file from MinIO and detect its real type from magic bytes.</li>
+      <li>PDF → PDFBox extracts text. A custom text stripper records every character's <b>font size and fill
+        colour</b>.</li>
+      <li>If a page has fewer than 100 characters, it is probably a scanned image: render it at 200 DPI and read it
+        with <b>Tesseract OCR</b>; save the average word confidence.</li>
+      <li>DOCX → Apache Tika.</li>
+      <li>Save <code>parsed.json</code> (text + layout stats + a sample of hidden text) next to the resume, set
+        status PARSED, emit <code>resume.parsed</code>.</li>
+    </ol>
+    <p><span class="tag t-why">Why</span>Resumes come in many shapes, so the parser has a fallback for each. Recording
+      font size and colour catches <b>keyword stuffing</b>: people hide words in white or 1-pt text so a machine sees
+      them but a human does not. Only the parser image carries Tesseract, so the other images stay small.</p>
+    <p><span class="tag t-how">How</span><code>DocumentParser</code> (routing), <code>PdfExtractor</code>,
+      <code>LayoutCapturingStripper</code> / <code>LayoutStats</code>, <code>OcrEngine</code> (finds the tessdata folder
+      at runtime because Ubuntu moves it), <code>DocxExtractor</code>, <code>ParseRecorder</code>.
+      <code>max-poll-records: 20</code> so a batch always finishes inside Kafka's 5-minute limit.</p>
+    <div class="note"><b>Bug found later (Phase 6):</b> PDFBox 3 does not track fill colour by default, so white text
+      was never counted. Fixed by registering the six <code>SetNonStroking*</code> colour operators in the stripper.</div>
+    <p><span class="tag t-proof">Checked</span>Seed 20 → 19 PARSED + 1 PARSE_FAILED (the planted corrupt file), 16 via
+      PDFBox + 3 via OCR (mean confidence 94.2), exactly 1 DLQ message, a 378-character hidden-text sample captured.</p>
+  </div>
+
+  <div class="feature">
+    <h3>3c. Extractor: LLM → structured profile (Phase 4)</h3>
+    <p><span class="tag t-logic">Logic</span></p>
+    <ol>
+      <li>Send the resume text to an LLM with a strict JSON schema: contact, skills, work history with dates,
+        projects, education, certifications.</li>
+      <li>Validate the answer against the schema. If it is invalid, retry once with the error message. If it is
+        still invalid, try the stronger fallback model (<code>gpt-oss-120b</code>).</li>
+      <li>Recover missing e-mail / phone with regular expressions.</li>
+      <li>Normalise skills through a 150-entry taxonomy (aliases like "k8s" → <code>kubernetes</code>, plus each
+        technology's first-release year). Unknown spellings go to <code>unmatched_skills</code>.</li>
+      <li>Compute in <b>Java, not in the LLM</b>: total experience months (overlapping jobs counted once), seniority,
+        completeness.</li>
+    </ol>
+    <p><span class="tag t-why">Why</span></p>
+    <ul>
+      <li><b>Never trust the LLM:</b> it can return broken JSON, make up numbers or be manipulated. The prompt says the
+        resume text is <i>data, not instructions</i> (defence against prompt injection), and all arithmetic is done in
+        code because LLMs are bad at maths.</li>
+      <li><b>Pluggable provider</b> (<code>LLM_PROVIDER=ollama|groq|gemini</code>): one stubborn resume that failed on
+        two models was rescued by a third. Model names are configuration, because providers retire them (two of them
+        404'd during the build).</li>
+      <li><b>Rate limits are back-pressure, not failures:</b> on a Groq 429 the client waits for the time the server
+        says, then tries again. Network/DNS failures are waited out (2-4-8-16-30 s).</li>
+      <li><b>Rules for load tests only:</b> the Groq free tier allows about 1,000 calls a day, so the 10K load-test
+        resumes (<code>load_test = true</code>) are read by <code>RuleExtractor</code>. Every real upload uses the LLM.</li>
+    </ul>
+    <p><span class="tag t-how">How</span><code>ProfileExtractor</code>, <code>ProfilePrompts</code>,
+      <code>ProfileValidator</code>, <code>RuleExtractor</code>, <code>LlmClient</code> with <code>GroqClient</code> /
+      <code>OllamaClient</code> / <code>GeminiClient</code>, <code>LlmHttp</code>, <code>SkillTaxonomy</code>,
+      <code>ExperienceMath</code>. <code>max-poll-records: 1</code> because one LLM call can take a long time.</p>
+    <p><span class="tag t-proof">Checked</span>19/19 profiles extracted; unit tests for the maths. A real 4.2K-character
+      resume that broke the small model's JSON mode was re-uploaded and logged "retrying once with
+      openai/gpt-oss-120b", then scored 60.1.</p>
+  </div>
+
+  <div class="feature">
+    <h3>3d. Scoring engine (Phase 5)</h3>
+    <p><span class="tag t-logic">Logic</span>Six components, each from 0 to 1, blended with weights, then limited by
+      must-have skills:</p>
+    <table>
+      <tr><th>Component</th><th>How it is computed</th><th>Default weight</th><th>Fresher job</th></tr>
+      <tr><td>skill_match</td><td>70% must-haves (each weighted by recency) + 30% nice-to-haves</td><td>0.35</td><td>0.35</td></tr>
+      <tr><td>experience_fit</td><td>months ÷ required months, capped at 1.0 (full marks at and above the bar)</td><td>0.25</td><td>0.05</td></tr>
+      <tr><td>projects</td><td>best Jaccard overlap between a project's words and the job's skills, × 4, capped at 1</td><td>0.15</td><td>0.25</td></tr>
+      <tr><td>education</td><td>dated degree 1.0, undated 0.6, none 0.1</td><td>0.10</td><td>0.15</td></tr>
+      <tr><td>certifications</td><td>2+ → 1.0, one → 0.7, none → 0.3</td><td>0.05</td><td>0.08</td></tr>
+      <tr><td>resume_quality</td><td>profile completeness</td><td>0.10</td><td>0.12</td></tr>
+    </table>
+<pre>recency of a must-have skill = 1.0 if used ≤ 1 year ago, 0.8 if ≤ 3, 0.6 if ≤ 5, else 0.4
+                               0.7 if only listed in the skills section (real but unproven)
+cap         = max(0.2, 1 − 0.25 × number_of_missing_must_haves)
+match_score = 100 × weighted_blend × cap
+knock-out   = experience below half the bar → score limited to 15 (shown, never hidden)
+              (fresher-friendly jobs never knock out on experience)
+final_score = match_score − fraud_penalty + rerank_adjustment   (generated by Postgres)</pre>
+    <p><span class="tag t-why">Why</span></p>
+    <ul>
+      <li><b>Explainable:</b> each component comes with "evidence chips" (e.g. "kafka (recent)", "2 missing must-haves
+        cap the score at 50%"), so a recruiter can see <i>why</i> someone ranks where they do.</li>
+      <li><b>Recency decay:</b> a skill used last year matters more than one used eight years ago.</li>
+      <li><b>Cap, not just subtract:</b> a candidate missing core skills should not reach the top just by being strong
+        elsewhere.</li>
+      <li><b>Never hidden:</b> even a knocked-out candidate stays visible at the bottom; a human decides.</li>
+      <li><b>Fresher-friendly weights:</b> for graduate jobs, the experience weight moves to projects and education.</li>
+      <li><b>More experience is never a minus</b> (see the fairness fix in 3i).</li>
+    </ul>
+    <p><span class="tag t-how">How</span><code>ScoringEngine</code> (pure function: profile + job → <code>ScoreCard</code>,
+      no database), <code>JobRequirements</code>, <code>ScoreRecorder</code>. Pure means it is easy to unit test and can
+      later move to <code>ats-common</code> so the candidate side uses the exact same code (planned for C4).</p>
+    <p><span class="tag t-proof">Checked</span>24/24 scored (top 88.55 with full breakdown); tests assert the cap, the
+      knock-out and that more experience never lowers the score.</p>
+  </div>
+
+  <div class="feature">
+    <h3>3e. Recruiter dashboard &amp; Live Flow (Phase 5, 2026-10-05/06)</h3>
+    <p><span class="tag t-logic">Logic</span>A React console: KPIs, ranked candidate table with component bars, a
+      report drawer (evidence, profile, audit timeline), shortlist / reject buttons, Review Queue, Talent Search and
+      <b>Live Flow</b>, an animated "river" of the pipeline. Stage nodes show how many applications sit in each stage
+      and how many ever passed; the edges show <b>real Kafka consumer lag</b>.</p>
+    <p><span class="tag t-why">Why</span>A recruiter needs to see the reasons, not only the number. Live Flow makes the
+      invisible asynchronous system visible: during the load test you can watch a queue fill up and drain after
+      scaling. All numbers come from real data; there are no fake metrics.</p>
+    <p><span class="tag t-how">How</span><code>frontend/</code> (Vite + Tailwind, <code>lucide-react</code> icons, a
+      custom space-themed canvas). Backend: <code>GET /api/stats/pipeline</code> (two GROUP BY queries) and
+      <code>GET /api/admin/lag</code> (Kafka AdminClient). Decisions (shortlist/reject) write an audit event. Served by
+      nginx on port 5174 with <code>/api</code> proxied.</p>
+  </div>
+
+  <div class="feature">
+    <h3>3f. Trust Service: fraud checks (Phase 6)</h3>
+    <p><span class="tag t-logic">Logic</span>Each check returns flags with a weight (how strongly it suggests fraud):</p>
+    <table>
+      <tr><th>Flag</th><th>Rule</th><th>Weight</th></tr>
+      <tr><td>HIDDEN_TEXT</td><td>≥ 20 invisible characters (tiny or white text)</td><td>0.7</td></tr>
+      <tr><td>TECH_ANACHRONISM</td><td>a technology used before its first release year</td><td>0.6</td></tr>
+      <tr><td>DUPLICATE_FILE</td><td>same SHA-256 under another name</td><td>0.6</td></tr>
+      <tr><td>OVERLAPPING_JOBS</td><td>two full-time jobs overlapping more than 3 months</td><td>0.5</td></tr>
+      <tr><td>IMPOSSIBLE_EXPERIENCE</td><td>claims more months than passed since graduation (+6 months grace)</td><td>0.5</td></tr>
+      <tr><td>COPIED_CONTENT</td><td>≥ 70% of work history matches another resume (from dedup)</td><td>0.5</td></tr>
+      <tr><td>DISPOSABLE_EMAIL</td><td>throw-away inbox domain</td><td>0.3</td></tr>
+      <tr><td>REPEAT_APPLICANT</td><td>same e-mail / phone applied before (a note only)</td><td>0</td></tr>
+    </table>
+<pre>fraud_score   = 1 − Π (1 − weight)          ("noisy-OR": two 0.5 signals → 0.75, never above 1)
+fraud_score ≥ 0.5 → status FLAGGED_FOR_REVIEW, fraud_penalty = fraud_score × 50</pre>
+    <p><span class="tag t-why">Why</span></p>
+    <ul>
+      <li><b>Noisy-OR</b> treats each signal as independent evidence: several weak signals add up, but the score can
+        never pass 1. Signals below 0.5 are shown to the recruiter but cost nothing.</li>
+      <li><b>Thresholds measured, not guessed:</b> honest claims sat at least 4 months under the graduation line, fakes
+        8 months over it.</li>
+      <li><b>Flags never overrule humans:</b> the system only flags. A recruiter <i>clears</i> (points come back) or
+        <i>confirms</i> (rejected). Status only moves from EXTRACTED/SCORED; SHORTLISTED/REJECTED are never touched. A
+        clearance survives re-checks unless genuinely new weighted evidence appears. Nothing is auto-rejected.</li>
+    </ul>
+    <p><span class="tag t-how">How</span><code>TrustCheck</code> interface with <code>HiddenTextCheck</code>,
+      <code>TimelineCheck</code>, <code>AnachronismCheck</code>, <code>DisposableEmailCheck</code>,
+      <code>DuplicateCheck</code>; <code>TrustScorer</code> (<code>FLAG_THRESHOLD = 0.5</code>, <code>MAX_PENALTY = 50</code>);
+      <code>TrustRecorder</code>; <code>FraudReviewController</code> for the Review Queue.</p>
+    <p><span class="tag t-proof">Checked</span>Every planted type flagged with its explanation; on the 34 existing
+      resumes exactly the 6 planted fakes were flagged, and the former top 4 (all fakes, boosted by hidden keywords)
+      dropped out of the lead; 33 fraud tests.</p>
+  </div>
+
+  <div class="feature">
+    <h3>3g. Deduplication: MinHash + LSH (Phase 6)</h3>
+    <p><span class="tag t-logic">Logic</span></p>
+    <ol>
+      <li>Same e-mail or phone → REPEAT_APPLICANT note. Same SHA-256 → DUPLICATE_FILE.</li>
+      <li>For copied work history: split title + company + description into 5-word "shingles".</li>
+      <li><b>MinHash</b> squeezes the shingle set into 128 numbers. The share of equal numbers between two resumes
+        estimates how much text they share (Jaccard similarity).</li>
+      <li><b>LSH</b> cuts the 128 numbers into 32 bands of 4. Two resumes become candidates only if a whole band
+        matches, so a new resume is compared with the few in its buckets, not with all 500K.</li>
+      <li>Verify candidates at ≥ 0.70 similarity → COPIED_CONTENT, and both resumes share a cluster id.</li>
+    </ol>
+    <p><span class="tag t-why">Why</span>Comparing every resume with every other is n² work, impossible at 500K. MinHash +
+      LSH make it close to constant per resume. The 0.70 cut-off is far above the most similar honest pair in the data
+      (0.12). Both sides of a match are flagged on purpose: the system cannot know who copied whom, so a human clears
+      the original once.</p>
+    <p><span class="tag t-how">How</span><code>MinHash</code> (fixed seed so results are repeatable), <code>Lsh</code>,
+      <code>DuplicateFinder</code>, <code>DedupRecorder</code>. Results flow to the Trust Service as <code>application.deduped</code>.
+      Known limit: heavy rewording of a short resume can fall below 0.70.</p>
+  </div>
+
+  <div class="feature">
+    <h3>3h. Embeddings &amp; hybrid search (Phase 7)</h3>
+    <p><span class="tag t-logic">Logic</span></p>
+    <ol>
+      <li><b>Embedder:</b> turns each profile into 768 numbers that capture its meaning (Ollama
+        <code>nomic-embed-text</code>), stored in pgvector. Texts about the same topic land close together even with
+        different words.</li>
+      <li><b>Indexer (CQRS read model):</b> on every change event it re-reads the candidate from Postgres and writes a
+        search-shaped document to OpenSearch, in batches of up to 500 events or 2 seconds.</li>
+      <li><b>Search:</b> runs keyword search (BM25) and meaning search (kNN) side by side with the same filters
+        (skills, minimum experience, hide flagged), then merges them with <b>Reciprocal Rank Fusion</b>.</li>
+    </ol>
+<pre>RRF score = 1/(60 + keyword_rank) + 1/(60 + semantic_rank)     (a list it is missing from adds 0)
+Each result is labelled: keyword, semantic or both.</pre>
+    <p><span class="tag t-why">Why</span></p>
+    <ul>
+      <li><b>Hybrid</b> because each method alone fails: keywords miss synonyms ("event driven" vs "Kafka"), and on
+        this templated data meaning scores bunch together at 0.50–0.65, so meaning alone is weak.</li>
+      <li><b>RRF uses positions, not scores</b>, so the BM25 and cosine scales never have to agree. k = 60 stops rank 1
+        from drowning everything else.</li>
+      <li><b>Keyword min-match</b> <code>"3&lt;75%"</code>: measured, OR matched 44/53 (everyone says "backend") and AND
+        only 14.</li>
+      <li><b>CQRS:</b> search reads a copy shaped for searching; Postgres stays the single truth. Because the indexer
+        re-reads the truth, duplicate or out-of-order events cannot corrupt the copy. Rebuild = rewind the indexer.</li>
+      <li><b>Degrade, don't break:</b> without Ollama, search answers keyword-only and says so; without OpenSearch it
+        returns a clear 503 and the rest of the API keeps working.</li>
+      <li>nomic needs <code>search_document:</code> / <code>search_query:</code> prefixes, so
+        <code>EmbeddingClient</code> exposes <code>embedDocument</code> / <code>embedQuery</code> and no caller can forget.
+        <code>keep_alive: 24h</code> stops Ollama unloading the model (the cold reload took 4.1 s).</li>
+    </ul>
+    <p><span class="tag t-how">How</span><code>embedder-service</code> (<code>ProfileText</code>,
+      <code>EmbeddingRecorder</code>), <code>indexer-service</code> (<code>ChangeEventsConsumer</code>,
+      <code>CandidateDocuments</code>), API <code>SearchController</code>, <code>SearchQueries</code>,
+      <code>HybridRanker</code> (<code>K = 60</code>).</p>
+    <p><span class="tag t-proof">Checked</span>"event driven backend" returns Aditya Joshi labelled
+      <code>semantic</code>: his profile mentions Kafka but never "event driven" (checked in SQL). 53 docs = 53 profiles.</p>
+  </div>
+
+  <div class="feature">
+    <h3>3i. AI rerank &amp; the fairness guard (Phase 8)</h3>
+    <p><span class="tag t-logic">Logic</span><code>POST /api/jobs/{id}/rerank</code> sends the top 50 candidates to the
+      stronger model as compact "evidence cards", 5 per call. For each it returns a 3-line summary, must-have coverage,
+      depth vs breadth, red flags and a score nudge of <b>at most ±10%</b>. It runs in the background and streams
+      results to the page.</p>
+    <p><span class="tag t-why">Why</span>A formula cannot read nuance the way a senior recruiter does; the LLM adds a
+      second opinion. But it may only <i>nudge</i>: the ±10% limit is enforced in code <b>and</b> by a database CHECK
+      constraint, so even a bug cannot let the AI rewrite the ranking. 5 per call because 10 per call got answers cut
+      off (only 17–24 of 50 judged).</p>
+    <div class="note"><b>The fairness story.</b> The model kept writing "overqualified — flight risk". Prompt fixes
+      barely helped, because the bias came from <b>our own formula</b>: since Phase 5 the matcher lowered experience
+      fit for anyone with 3× the required experience and printed that label. Experience correlates with age, so this
+      is an age-discrimination proxy. It hit <b>263 of 359</b> candidates. Fix: the penalty was removed (a test now
+      asserts more experience is never a minus); everyone was re-scored by <b>replaying Kafka</b> (no hand-edited
+      scores); old verdicts were cleared; and the rerank now <b>discards any verdict</b> that relies on such a proxy
+      (the candidate keeps the formula score). The re-run had 0 bias discards.
+      <br><b>Lesson:</b> when an AI repeats a bias, check what you fed it before tuning the prompt.</div>
+    <p><span class="tag t-how">How</span><code>RerankController</code>, <code>Reranker</code> (<code>BATCH = 5</code>),
+      <code>RerankCards</code>, <code>RerankPrompts</code>, <code>RerankRecorder</code>, migration V9. One full rerank
+      uses about 35–40K tokens against a 200K tokens/day limit, so it is run once per demo.</p>
+  </div>
+
+  <div class="feature">
+    <h3>3j. 10K load test &amp; scaling lessons (Phase 8)</h3>
+    <p><span class="tag t-logic">Logic</span><code>./tools/seed.sh --bulk 10000</code> renders 10,000 PDFs (~40 s on all
+      cores) and 20 parallel workers push them through the real API. Then
+      <code>docker compose up -d --scale parser=8 --scale extractor=4</code> and watch the lag drain.</p>
+    <p><span class="tag t-proof">Measured</span>10,000 submitted in 676 s with 0 API errors; backlog 2,927 → 0;
+      10,369 applications processed, 57 flagged, 7 parse-failed (planted); search index 10,362 docs.</p>
+    <p><span class="tag t-why">What it taught</span></p>
+    <ol>
+      <li><b>Database connections ran out.</b> 8 parsers + 4 extractors × default pool 10 ≈ 190, Postgres allowed 100.
+        Fix: worker pools of 4, Postgres max 200. Production: PgBouncer.</li>
+      <li><b>The parser never committed progress.</b> 500-record batches outlived Kafka's 5-minute poll interval, so
+        Kafka kicked the worker out mid-batch. Fix: <code>max-poll-records: 20</code>.</li>
+      <li><b>Partitions cap parallelism.</b> The leftover work sat in 4 of 12 partitions, so 4 of 8 parsers idled.</li>
+      <li><b>The laptop was CPU-bound</b> (~15 of 16 cores busy). Honest result: no clean 8× speed-up on this machine
+        (8 parsers ≈ 3.5/s vs 1 ≈ 3.3/s). DEMO.md describes how to measure it properly.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================ 4. PART 2 ============================ -->
+<section class="page-break">
+  <h2>4. Part 2: the candidate side</h2>
+  <p>Candidates get their own portal on the <b>same pipeline and the same scoring engine</b>, so nothing is scored two
+    different ways. Built one phase at a time (C1 … C8). C1 is merged into <code>main</code>; C2 is complete on
+    <code>feat/candidate-profile</code>.</p>
+
+  <div class="feature">
+    <h3>4a. C1: accounts &amp; sign-in</h3>
+    <p><span class="tag t-logic">Logic</span></p>
+    <ul>
+      <li><b>Two tickets.</b> A 15-minute <b>access token</b> (JWT signed with HS256, sent as
+        <code>Authorization: Bearer</code>, kept only in page memory) and a 7-day <b>refresh ticket</b> in an httpOnly,
+        SameSite=Strict cookie visible only to <code>/api/auth/*</code>. The database stores only the SHA-256 of the
+        refresh ticket.</li>
+      <li><b>Rotation + theft alarm.</b> Each refresh replaces the ticket. If an already-replaced ticket comes back,
+        someone copied it, so every ticket of that user is cancelled. The row is locked
+        (<code>SELECT … FOR UPDATE</code>) so two simultaneous refreshes run one after another.</li>
+      <li><b>Roles:</b> CANDIDATE, RECRUITER, ADMIN. Public: <code>/api/auth/**</code>, health, skills list, the Part 1
+        apply flow. <code>/api/candidate/**</code> → CANDIDATE. <b>Everything else → recruiter-only by default.</b></li>
+      <li><b>E-mail verification</b>: a one-time link (32 random bytes, only the hash stored, 24 h). Mailpit catches
+        the mail locally.</li>
+      <li><b>Account claim:</b> once verified (and at every later sign-in), earlier applications with the same e-mail
+        are linked to the account. <code>@intake.invalid</code> placeholders can never be claimed.</li>
+      <li><b>Per-IP rate limits:</b> sign-in 10/min, sign-up 5/10 min, resend 3/10 min → HTTP 429 with
+        <code>Retry-After</code>.</li>
+      <li><b>Ownership:</b> a candidate can only read their own applications; someone else's answers 403. The caller id
+        always comes from the signed token, never from the request.</li>
+      <li><b>Neutral statuses:</b> candidates see Received / In review / Not selected / "We couldn't read your resume".
+        A fraud flag looks exactly like any other review.</li>
+    </ul>
+    <p><span class="tag t-why">Why</span></p>
+    <ul>
+      <li>Short access tokens limit the damage if one leaks; the refresh cookie cannot be read by JavaScript (protects
+        against XSS) and is not sent cross-site (protects against CSRF). Storing hashes means a database leak does not
+        leak working tickets.</li>
+      <li>Recruiter-only by default means a forgotten rule fails <i>safe</i>.</li>
+      <li>Claim only after verification, because anyone can type any e-mail into a public form.</li>
+      <li>Neutral statuses: showing <code>FLAGGED_FOR_REVIEW</code> would tip off a cheater. The mapping is an exhaustive
+        <code>switch</code> with no default, so a new pipeline status will not compile until someone decides what
+        candidates see.</li>
+      <li>Sign-in says "wrong email or password" for both cases, and checks a dummy BCrypt hash for unknown e-mails, so
+        even the response time does not reveal which accounts exist.</li>
+      <li>The UI serialises refreshes across browser tabs with the Web Locks API; otherwise two tabs refreshing at once
+        would look like theft and sign everyone out.</li>
+      <li>Spring Security's own JWT support (Nimbus) was used, so no third-party JWT library was added.</li>
+    </ul>
+    <p><span class="tag t-how">How</span><code>com.ats.auth</code>: <code>SecurityConfig</code>, <code>TokenService</code>,
+      <code>AuthController</code>, <code>AccountService</code>, <code>EmailVerificationService</code>,
+      <code>RateLimiter</code> (in memory: one API instance, no Redis), <code>RecruiterSeeder</code> (creates the demo
+      recruiter from <code>.env</code>), <code>Masking</code> (logs show <code>p***@gmail.com</code>).
+      <code>MyApplicationsController</code>. Migrations V10, V11. <code>Candidate.userId</code> is mapped read-only in JPA
+      because the extractor saves whole candidate rows and would otherwise overwrite a claim with NULL.
+      Frontend: <code>/candidate/signup</code>, <code>/login</code>, <code>/verify</code>, <code>/candidate</code>.</p>
+    <p><span class="tag t-proof">Checked</span>Access rules tested through the real filter chain; the 403 tests were
+      proven by deliberately weakening the rule for one run (they failed as they should). 161 tests passed across all 9
+      modules; live curl and headless-Chrome checks; Part 1 smoke test still scores a new applicant in ~6 s.</p>
+  </div>
+
+  <div class="feature">
+    <h3>4b. C2: master profile &amp; profile resume</h3>
+    <p><span class="tag t-logic">Logic</span></p>
+    <ol>
+      <li>A candidate uploads a resume for <i>themselves</i>, not for a job, to <code>profiles/{account}/v{n}/</code>,
+        with the same checks as application uploads.</li>
+      <li>It flows through the <b>same parser and extractor</b> on its own topics:
+        <code>profile.resume.uploaded</code> → <code>profile.resume.parsed</code> → <code>profile.changed</code> →
+        <code>profile.embedded</code>.</li>
+      <li><b>One profile per account</b>, rebuilt from each new version.</li>
+      <li>The candidate can <b>fix</b> the result: add/remove skills and correct job dates. Fixes are stored apart from
+        what was read (<code>profile_overrides</code>), so a re-upload never wipes them. Date fixes are keyed by
+        lower-case "company|title", so they survive a re-parse that lists jobs in another order.</li>
+      <li><b>Effective profile</b> = what was read + the fixes, with months, seniority and completeness recomputed.
+        It is what the page shows, what gets embedded, and what later phases read.</li>
+      <li>The "My Resume" page follows Uploaded → Read → Profile built → Searchable live over SSE.</li>
+    </ol>
+    <p><span class="tag t-why">Why</span></p>
+    <ul>
+      <li><b>Separate topics</b>, because <code>resume.extracted</code> already has four application-only readers
+        (matcher, fraud, dedup, embedder). On a shared topic each would look for an application that does not exist and
+        fill the DLQ. With separate topics those services did not change at all.</li>
+      <li><b>Subject in the envelope</b> (<code>subject_type</code>, <code>subject_id</code>) so every event says what it
+        is about. Older events without it are read as APPLICATION, so nothing breaks.</li>
+      <li><b>One profile per account, not per candidate row:</b> candidate rows are one per application (one person had
+        4 rows).</li>
+      <li><b>Two safety rules:</b> a failed upload never wipes a good profile, and an older version's late answer never
+        replaces a newer one. The late-version test was proven by deleting the guard for one run.</li>
+      <li><b>One shared function</b> (<code>EffectiveProfile</code>) so no screen or service sees a different
+        profile. For that, <code>ExperienceMath</code> moved from the extractor into <code>ats-common</code>
+        (same code, same tests).</li>
+      <li>Profile resumes always use the LLM: it is a real person's resume, never load-test data.</li>
+      <li>Failures speak plainly to the candidate ("We couldn't read this file — if it's a scan, try a clearer copy");
+        technical causes stay in the logs.</li>
+    </ul>
+    <p><span class="tag t-how">How</span>API: <code>ProfileController</code>, <code>ProfileResumeService</code>,
+      <code>ProfileOverridesService</code> (<code>PUT /api/candidate/profile/overrides</code>; 400 for bad dates or an
+      unknown role, 409 before anything was read), <code>ProfileEventsListener</code> + <code>ProfileSseHub</code>.
+      Workers: <code>ProfileResumeUploadedConsumer</code> (group <code>parser-profile</code>),
+      <code>ProfileResumeParsedConsumer</code> (<code>extractor-profile</code>), <code>ProfileChangedConsumer</code>
+      (<code>embedder-profile</code>). Shared: <code>EffectiveProfile</code>, <code>ExperienceMath</code>,
+      <code>DocumentParser</code>, <code>UploadedFiles</code>. Migration V12. Frontend: <code>/candidate/resume</code>
+      with drag-and-drop upload and real progress (<code>lib/upload.js</code>).</p>
+    <p><span class="tag t-proof">Checked</span>Sanjay Joshi uploaded through the page: uploaded → parsed in ~1 s →
+      extracted ~34 s later (the LLM) → embedded 1 s after. Sneha Singh added Kafka, removed HTML and fixed one end date:
+      experience 94 → 103 months, vector rewritten; another candidate's open stream received 0 of her events.
+      196 tests passed across all 9 modules.</p>
+  </div>
+</section>
+
+<!-- ============================ 5. DECISIONS ============================ -->
+<section class="page-break">
+  <h2>5. Decision summary table</h2>
+  <table>
+    <tr><th>Decision</th><th>Alternative not taken</th><th>Why</th></tr>
+    <tr><td>Kafka events between services</td><td>Services calling each other over HTTP</td><td>A slow stage cannot slow the others; lag shows load; scale by adding consumers.</td></tr>
+    <tr><td>Transactional outbox</td><td>Send to Kafka directly after saving</td><td>A crash between the two writes would lose or invent events.</td></tr>
+    <tr><td>Polling outbox relay</td><td>Debezium CDC</td><td>Much simpler for a demo; Debezium is the production step.</td></tr>
+    <tr><td><code>processed_events</code> ledger</td><td>Hoping messages arrive once</td><td>At-least-once delivery is a fact; the ledger also enables safe replays.</td></tr>
+    <tr><td>Presigned uploads to MinIO</td><td>Upload through the API</td><td>The API never carries file bytes; S3 later is an env change.</td></tr>
+    <tr><td>Magic-byte checks</td><td>ClamAV virus scan</td><td>Enough for a demo; ClamAV is the production step.</td></tr>
+    <tr><td>LLM extracts, Java computes</td><td>Let the LLM compute experience</td><td>LLMs make arithmetic mistakes; code is testable and repeatable.</td></tr>
+    <tr><td>Pluggable LLM providers + fallback model</td><td>One fixed model</td><td>Models fail on some inputs and get retired; switching rescued real resumes.</td></tr>
+    <tr><td>Rules for load-test resumes</td><td>LLM for everything</td><td>Free tier ≈ 1,000 calls/day; 10K would take 10+ days.</td></tr>
+    <tr><td>Explainable component scoring</td><td>One opaque ML score</td><td>Recruiters must see why; evidence chips show it.</td></tr>
+    <tr><td>Must-have cap + visible knock-out</td><td>Hide weak candidates</td><td>Weak matches rank low but a human still sees them.</td></tr>
+    <tr><td>Split score columns + generated <code>final_score</code></td><td>One service owns the whole score</td><td>Three services write without overwriting each other.</td></tr>
+    <tr><td>Fraud flags only, humans decide</td><td>Auto-reject fraud</td><td>Heuristics can be wrong; a clearance sticks.</td></tr>
+    <tr><td>Noisy-OR fraud score</td><td>Sum of weights</td><td>Evidence combines but never exceeds 1.</td></tr>
+    <tr><td>MinHash + LSH</td><td>Compare all pairs</td><td>n² comparisons are impossible at 500K.</td></tr>
+    <tr><td>Hybrid search with RRF</td><td>Keyword or vector only</td><td>Each alone fails; RRF needs no score calibration.</td></tr>
+    <tr><td>OpenSearch read model (CQRS)</td><td>Search straight in Postgres</td><td>Search-shaped copy, rebuildable from the truth.</td></tr>
+    <tr><td>Rerank limited to ±10% (code + CHECK)</td><td>Let the AI re-rank freely</td><td>The AI advises; it cannot take over the ranking.</td></tr>
+    <tr><td>Short JWT + rotating refresh cookie</td><td>Long-lived token in localStorage</td><td>Limits damage of a leak; cookie unreadable by scripts.</td></tr>
+    <tr><td>Recruiter-only by default</td><td>List protected endpoints</td><td>A forgotten rule fails safe.</td></tr>
+    <tr><td>In-memory rate limits</td><td>Redis</td><td>One API instance in the demo; Redis when there are several.</td></tr>
+    <tr><td>Separate profile topics</td><td>Reuse application topics</td><td>Application-only services stay untouched and the DLQ stays clean.</td></tr>
+    <tr><td>Shared Postgres</td><td>One database per service</td><td>Simpler on one laptop; data ownership split is the next step.</td></tr>
+  </table>
+</section>
+
+<!-- ============================ 6. LESSONS ============================ -->
+<section>
+  <h2>6. Bugs found and lessons learned</h2>
+  <table>
+    <tr><th>What happened</th><th>Fix</th><th>Lesson</th></tr>
+    <tr><td>White hidden text was never detected (PDFBox did not track fill colour)</td><td>Registered the colour operators</td><td>Test the detector against the real trick, not only the counter.</td></tr>
+    <tr><td>"Overqualified" penalty in our own formula fed the AI an age bias</td><td>Removed; replayed scores; guard discards biased verdicts</td><td>Check your inputs before tuning a prompt.</td></tr>
+    <tr><td>Postgres ran out of connections when scaling</td><td>Pool 4 per worker, max 200</td><td>Scaling a worker multiplies its pool.</td></tr>
+    <tr><td>Parser kicked out mid-batch, never committed</td><td><code>max-poll-records: 20</code> (extractor 1)</td><td>A batch must finish inside <code>max.poll.interval</code>.</td></tr>
+    <tr><td>Small model returned invalid JSON on a long real resume</td><td>Fallback to <code>gpt-oss-120b</code></td><td>Failures at temperature 0 repeat; a retry needs a different model.</td></tr>
+    <tr><td>Docker DNS blips used up all retries in 3 s</td><td>Wait out network errors 2-4-8-16-30 s</td><td>Separate "network down" from "bad input".</td></tr>
+    <tr><td>Kafka's default 7-day retention deleted events during a pause</td><td>Retention 720 h</td><td>Defaults are made for production, not paused demos.</td></tr>
+    <tr><td>A new module broke every image build</td><td><code>COPY</code> line in every Dockerfile</td><td>Recorded as a trap in CLAUDE.md.</td></tr>
+    <tr><td>Candidate status API exposed <code>FLAGGED_FOR_REVIEW</code></td><td>Exhaustive neutral mapping</td><td>Internal states are not user-facing text.</td></tr>
+    <tr><td>Ollama unloaded the model after 5 idle minutes</td><td><code>keep_alive: 24h</code></td><td>Cold starts look like random failures.</td></tr>
+  </table>
+</section>
+
+<!-- ============================ 7. SCALE ============================ -->
+<section>
+  <h2>7. From this laptop to 500K applicants per job</h2>
+  <p>The architecture is the production architecture; only the scale is smaller. Each row is arithmetic on a
+    measurement from this laptop, not a benchmark.</p>
+  <table>
+    <tr><th>Here</th><th>At 500K</th><th>Reason</th></tr>
+    <tr><td>Docker Compose + <code>--scale</code></td><td>Kubernetes + KEDA autoscaling on Kafka lag</td><td>Lag is the honest load signal Live Flow already shows.</td></tr>
+    <tr><td>12 partitions</td><td>At least as many as the maximum consumers (100+)</td><td>One partition = one consumer at a time.</td></tr>
+    <tr><td>Postgres, 200 connections</td><td>+ PgBouncer, read replicas</td><td>8 parsers already exhausted 100 connections.</td></tr>
+    <tr><td>MinIO</td><td>AWS S3</td><td>Same SDK: an env change.</td></tr>
+    <tr><td>Groq free tier / Ollama</td><td>Provisioned throughput (e.g. Bedrock)</td><td>500K × ~2.5–3K tokens ≈ 1.25–1.5 billion tokens.</td></tr>
+    <tr><td>CPU embeddings, ~0.27 s each</td><td>GPU or managed embeddings</td><td>500K × 0.27 s ≈ 37 CPU-hours.</td></tr>
+    <tr><td>One parser ≈ 3.3 resumes/s</td><td>Many parsers, partitions to match</td><td>500K ÷ 3.3/s ≈ 42 hours on one parser.</td></tr>
+    <tr><td>Polling outbox</td><td>Debezium CDC</td><td>Lower latency, no polling.</td></tr>
+  </table>
+</section>
+
+<!-- ============================ 8. NEXT ============================ -->
+<section>
+  <h2>8. What comes next</h2>
+  <table>
+    <tr><th>Phase</th><th>Plan</th></tr>
+    <tr><td>C3</td><td>Role archetypes &amp; a role classifier reading <code>profile.embedded</code>. Before it: review fix #1 (C, C++ and C# currently share one taxonomy key).</td></tr>
+    <tr><td>C4</td><td>Resume feedback engine; the pure <code>ScoringEngine</code> moves to <code>ats-common</code> so candidates see the same maths recruiters use. Daily cap of 5 per user (shared free tier).</td></tr>
+    <tr><td>C5</td><td>Job board, match %, one-click apply, application tracker. Before it: review fix #2 (the pipeline must not overwrite human decisions).</td></tr>
+    <tr><td>C6</td><td>Learning paths &amp; GitHub verification.</td></tr>
+    <tr><td>C7</td><td>Career assistant (cap 20/day), job alerts, consent &amp; privacy.</td></tr>
+    <tr><td>C8</td><td>Polish, demo data, demo script.</td></tr>
+  </table>
+  <p class="muted">Other open items: merge <code>feat/candidate-profile</code> (C2) into <code>main</code>; a clean 8× scaling
+    measurement on a machine with spare CPU and RAM; per-service data ownership; Debezium, ClamAV, PgBouncer and Redis for
+    production.</p>
+</section>
+
+</body>
+</html>
