@@ -262,7 +262,7 @@ nothing is scored two different ways. Built one phase at a time; status in
   recruiter-only by default, so the dashboard now has a sign-in page (the demo
   recruiter is created from `.env`). The Part 1 apply flow stays public: applicants
   never need an account, and `seed.sh` works unchanged.
-- **E-mail verification** with a one-time link (24 h). **Mailpit** catches every
+- **E-mail verification** by a 6-digit code (OTP): 10 minutes, 5 wrong tries burn it, stored only as an HMAC. **Mailpit** catches every
   mail locally — nothing leaves the laptop.
 - **Account claim.** Once the e-mail is verified, every earlier application sent
   with it is linked to the account (and again at each sign-in); before verification

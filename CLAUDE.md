@@ -77,7 +77,7 @@ test inside the Maven container. `MSYS_NO_PATHCONV=1` stops Git Bash from rewrit
 
 - The Part 1 apply flow (`POST /api/candidates`, `/api/jobs/*/applications`, resume `upload-url` /
   `complete`) is public on purpose: applicants never need an account, and `seed.sh` uses it.
-- Mailpit catches every e-mail, so anyone who can open :8025 can read every verify link — a local
+- Mailpit catches every e-mail, so anyone who can open :8025 can read every verification code — a local
   mail catcher, not a real inbox. Per-IP rate limits live in memory (one API instance, no Redis).
 - Polling outbox relay instead of Debezium; magic-byte file checks instead of ClamAV.
 - One shared Postgres for all services (per-service data ownership is the documented next step).
