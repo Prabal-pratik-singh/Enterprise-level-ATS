@@ -2,7 +2,6 @@ import { Link, Navigate, NavLink, Route, Routes } from 'react-router-dom'
 import { Rocket, LogOut } from 'lucide-react'
 import { logout, useSession } from '../auth'
 import AuthForm from './AuthForm'
-import VerifyPage from './VerifyPage'
 import CandidateDashboard from './CandidateDashboard'
 import ResumePage from './ResumePage'
 
@@ -16,7 +15,6 @@ export default function CandidateApp() {
       <TopBar candidate={candidate} />
       <main className="mx-auto mt-6 w-full max-w-3xl pb-10">
         <Routes>
-          <Route path="/candidate/verify" element={<VerifyPage />} />
           <Route path="/candidate/signup" element={candidate ? <Navigate to="/candidate" replace /> : <AuthForm mode="signup" />} />
           <Route path="/candidate/login" element={candidate ? <Navigate to="/candidate" replace /> : <AuthForm mode="login" />} />
           <Route path="/candidate" element={home(status, user)} />

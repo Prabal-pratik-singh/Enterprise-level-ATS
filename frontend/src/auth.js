@@ -42,7 +42,7 @@ export async function login(email, password) {
   setSession(await postAuth('/api/auth/login', { email, password }))
 }
 
-/** A new candidate account — signed in at once; the verify link goes to the inbox (Mailpit here). */
+/** A new candidate account — signed in at once; the 6-digit code goes to the inbox (Mailpit here). */
 export async function signup(email, password) {
   setSession(await postAuth('/api/auth/signup', { email, password }))
 }
@@ -51,14 +51,19 @@ export async function signup(email, password) {
  * The link from the e-mail; works signed in or out. When the person who opened it is the one signed
  * in, the session is refreshed so it shows "verified". mine = the signed-in user is that account.
  */
-export async function verifyEmail(token) {
-  const user = await postAuth('/api/auth/verify-email', { token })
-  const mine = session.status === 'signed-in' && session.user.id === user.id
-  if (mine) await refreshSession()
-  return { user, mine }
+export async function verifyEmail(code) {
+  const res = await authFetch('/api/auth/verify-email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.message || `request failed (HTTP ${res.status})`)
+  await refreshSession()   // the session picks up "verified"
+  return data
 }
 
-/** A fresh verify link for the signed-in user (rate-limited by the API). */
+/** A fresh 6-digit code for the signed-in user (rate-limited by the API). */
 export async function resendVerification() {
   const res = await authFetch('/api/auth/resend-verification', { method: 'POST' })
   if (!res.ok) {

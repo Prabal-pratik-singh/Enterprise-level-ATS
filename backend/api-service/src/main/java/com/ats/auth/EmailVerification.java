@@ -26,7 +26,10 @@ public class EmailVerification {
     private Instant expiresAt;
 
     @Column(name = "used_at")
-    private Instant usedAt;   // NULL = not opened yet
+    private Instant usedAt;   // NULL = not used yet
+
+    @Column(nullable = false)
+    private int attempts;     // wrong tries on this code (V13); 5 burns it
 
     protected EmailVerification() {
     }
@@ -36,6 +39,14 @@ public class EmailVerification {
         this.userId = userId;
         this.tokenHash = tokenHash;
         this.expiresAt = expiresAt;
+    }
+
+    public void countWrongTry() {
+        attempts++;
+    }
+
+    public int getAttempts() {
+        return attempts;
     }
 
     public void markUsed() {

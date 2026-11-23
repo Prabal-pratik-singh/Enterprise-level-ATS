@@ -38,7 +38,7 @@ public class AuthController {
     public record Session(String accessToken, long expiresInSeconds, UserView user) {
     }
 
-    public record VerifyRequest(String token) {
+    public record VerifyRequest(String code) {
     }
 
     static final String REFRESH_COOKIE = "ats_refresh";
@@ -47,6 +47,7 @@ public class AuthController {
     private static final int LOGIN_LIMIT = 10;              // per minute
     private static final int SIGNUP_LIMIT = 5;              // per 10 minutes
     private static final int RESEND_LIMIT = 3;              // per 10 minutes (each one sends an e-mail)
+    private static final int VERIFY_LIMIT = 10;             // per 10 minutes, on top of 5 tries per code
 
     private final AccountService accounts;
     private final TokenService tokens;
@@ -65,12 +66,12 @@ public class AuthController {
         this.props = props;
     }
 
-    /** New candidate account, signed in at once; the verify link goes to the inbox (Mailpit locally). */
+    /** New candidate account, signed in at once; the 6-digit code goes to the inbox (Mailpit locally). */
     @PostMapping("/signup")
     public ResponseEntity<Session> signUp(@RequestBody Credentials body, HttpServletRequest request) {
         limiter.check("signup", RateLimiter.clientIp(request), SIGNUP_LIMIT, Duration.ofMinutes(10));
         UserAccount user = accounts.signUp(body.email(), body.password());   // committed before the mail goes out
-        verifications.sendLink(user);
+        verifications.sendCode(user);
         return session(HttpStatus.CREATED, tokens.issue(user));
     }
 
@@ -80,13 +81,15 @@ public class AuthController {
         return session(HttpStatus.OK, tokens.issue(accounts.logIn(body.email(), body.password())));
     }
 
-    /** The link from the e-mail: verifies the address and links earlier applications with it. */
+    /** The code from the e-mail, typed by the signed-in user: verifies the address and links earlier applications. */
     @PostMapping("/verify-email")
-    public UserView verifyEmail(@RequestBody VerifyRequest body) {
-        return UserView.of(verifications.verify(body.token()));
+    public UserView verifyEmail(@RequestBody VerifyRequest body, @AuthenticationPrincipal Jwt token,
+                                HttpServletRequest request) {
+        limiter.check("verify", RateLimiter.clientIp(request), VERIFY_LIMIT, Duration.ofMinutes(10));
+        return UserView.of(verifications.verifyCode(UUID.fromString(token.getSubject()), body.code()));
     }
 
-    /** A new link for the signed-in user (the first mail was lost, or the link expired). */
+    /** A new code for the signed-in user (the mail was lost, the code expired or was burned). */
     @PostMapping("/resend-verification")
     public ResponseEntity<Void> resendVerification(@AuthenticationPrincipal Jwt token, HttpServletRequest request) {
         UserAccount user = users.findById(UUID.fromString(token.getSubject()))
@@ -95,7 +98,7 @@ public class AuthController {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "your e-mail is already verified");
         }
         limiter.check("resend", RateLimiter.clientIp(request), RESEND_LIMIT, Duration.ofMinutes(10));
-        verifications.sendLink(user);
+        verifications.sendCode(user);
         return ResponseEntity.noContent().build();
     }
 

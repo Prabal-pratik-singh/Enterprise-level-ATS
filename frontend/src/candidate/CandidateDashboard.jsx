@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { MailWarning, Briefcase, Send, FileText } from 'lucide-react'
 import { api } from '../api'
-import { resendVerification } from '../auth'
+import { resendVerification, verifyEmail } from '../auth'
 import CandidateStatus from './CandidateStatus'
 
 /**
@@ -87,7 +87,36 @@ function ResumeCard() {
 
 /** Until the e-mail is verified, nothing from earlier applications is linked — say why, offer a new link. */
 function VerifyBanner({ email }) {
-  const [state, setState] = useState(null) // null | 'sending' | 'sent' | an error message
+  const [digits, setDigits] = useState(['', '', '', '', '', ''])
+  const [state, setState] = useState(null) // null | 'checking' | 'sending' | 'sent' | an error message
+  const boxes = useRef([])
+
+  const submit = async (code) => {
+    setState('checking')
+    try {
+      await verifyEmail(code)   // the session refresh re-renders the dashboard as verified
+    } catch (e) {
+      setState(e.message)
+      setDigits(['', '', '', '', '', ''])
+      boxes.current[0]?.focus()
+    }
+  }
+
+  // one digit per box; typing moves on, backspace moves back, pasting all six fills them
+  const type = (i, value) => {
+    const chars = value.replace(/\D/g, '')
+    if (chars.length > 1) {   // a pasted code
+      const next = chars.slice(0, 6).padEnd(6, ' ').split('').map((c) => c.trim())
+      setDigits(next)
+      if (chars.length >= 6) submit(chars.slice(0, 6))
+      return
+    }
+    const next = [...digits]
+    next[i] = chars
+    setDigits(next)
+    if (chars && i < 5) boxes.current[i + 1]?.focus()
+    if (next.every(Boolean)) submit(next.join(''))
+  }
 
   const resend = async () => {
     setState('sending')
@@ -102,19 +131,30 @@ function VerifyBanner({ email }) {
   return (
     <div className="card flex flex-wrap items-start gap-3 p-4 ring-1 ring-marigold/30 !rounded-2xl">
       <MailWarning size={18} className="mt-0.5 shrink-0 text-marigold" />
-      <div className="min-w-0 flex-1 space-y-1 text-sm">
+      <div className="min-w-0 flex-1 space-y-2 text-sm">
         <p className="font-medium">Verify your e-mail</p>
         <p className="text-dim">
-          We sent a link to <span className="break-all text-ink">{email}</span>. Opening it proves the address is
-          yours and links the applications you already sent with it. On this demo every e-mail lands
-          in <a href="http://localhost:8025" target="_blank" rel="noreferrer" className="text-cyan hover:underline">Mailpit</a>.
+          Enter the 6-digit code we sent to <span className="break-all text-ink">{email}</span>. It proves the
+          address is yours and links the applications you already sent with it. On this demo every e-mail
+          lands in <a href="http://localhost:8025" target="_blank" rel="noreferrer" className="text-cyan hover:underline">Mailpit</a>.
         </p>
-        {state === 'sent' && <p className="text-emerald-300">A new link is on its way.</p>}
-        {state && state !== 'sending' && state !== 'sent' && <p className="text-rose-400">{state}</p>}
+        <div className="flex gap-2" aria-label="verification code">
+          {digits.map((d, i) => (
+            <input key={i} ref={(el) => { boxes.current[i] = el }} value={d} inputMode="numeric"
+                   autoComplete={i === 0 ? 'one-time-code' : 'off'} maxLength={i === 0 ? 6 : 1}
+                   disabled={state === 'checking'} aria-label={`digit ${i + 1}`}
+                   onChange={(e) => type(i, e.target.value)}
+                   onKeyDown={(e) => { if (e.key === 'Backspace' && !d && i > 0) boxes.current[i - 1]?.focus() }}
+                   className="h-11 w-10 rounded-lg bg-white/5 text-center text-lg tabular-nums ring-1 ring-white/15 outline-none focus:ring-marigold/60 disabled:opacity-40" />
+          ))}
+        </div>
+        {state === 'checking' && <p className="text-dim">Checking…</p>}
+        {state === 'sent' && <p className="text-emerald-300">A new code is on its way — the old one no longer works.</p>}
+        {state && !['checking', 'sending', 'sent'].includes(state) && <p className="text-rose-400">{state}</p>}
       </div>
-      <button onClick={resend} disabled={state === 'sending'}
+      <button onClick={resend} disabled={state === 'sending' || state === 'checking'}
               className="flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-1.5 text-sm hover:bg-white/15 disabled:opacity-40">
-        <Send size={14} /> {state === 'sending' ? 'Sending…' : 'Send a new link'}
+        <Send size={14} /> {state === 'sending' ? 'Sending…' : 'Send a new code'}
       </button>
     </div>
   )
